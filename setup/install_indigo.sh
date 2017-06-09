@@ -3,10 +3,10 @@
 export ROS_DISTRO=indigo
 export ROS_CI_DESKTOP="`lsb_release -cs`"  # e.g. [precise|trusty|...]
 export CI_SOURCE_PATH=$(pwd)
-export CATKIN_OPTIONS=$CI_SOURCE_PATH/catkin.options
+export CATKIN_OPTIONS="$CI_SOURCE_PATH/catkin.options"
 export ROS_PARALLEL_JOBS='-j8 -l6'
-export CATKIN_WS=$HOME/costar_ws
-export COSTAR_PLAN_DIR=$HOME/costar_ws/src/costar_plan
+export CATKIN_WS="$HOME/costar_ws"
+export COSTAR_PLAN_DIR="$HOME/costar_ws/src/costar_plan"
 
 echo "======================================================"
 echo "PYTHON"
@@ -35,7 +35,6 @@ cd $CATKIN_WS/src
 
 git clone https://github.com/cburbridge/python_pcd.git
 git clone gttps://github.com/jhu-lcsr/costar_objects.git
-git clone https://github.com/cpaxton/lcsr_assembly.git --branch devel
 git clone https://github.com/cpaxton/dmp.git --branch indigo
 git clone https://github.com/cpaxton/robotiq_85_gripper.git
 rosdep install -y --from-paths ./ --ignore-src --rosdistro $ROS_DISTRO

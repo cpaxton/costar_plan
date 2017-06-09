@@ -10,7 +10,6 @@ project(costar_simulation)
 find_package(catkin REQUIRED COMPONENTS
   gazebo_ros
   gazebo_plugins
-  assembly_sim
   roboticsgroup_gazebo_plugins
   robotiq_85_bringup
   robotiq_85_description

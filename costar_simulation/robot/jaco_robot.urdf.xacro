@@ -8,5 +8,14 @@
   <xacro:include filename="$(find jaco_description)/urdf/jaco.urdf.xacro" />
   <xacro:jaco_arm parent="robot_root" mass_divider="1" finger_mass_divider="1">
      <origin xyz="0 0 0" rpy="0 0 0" />
-  </xacro:jaco_arm>
+   </xacro:jaco_arm>
+
+  <!-- Create a grasp link to specify the end of the robot arm -->
+  <link name="grasp_link"/>
+  <joint name="ee_to_grasp_link" type="fixed">
+    <parent link="jaco_6_hand_limb" />
+    <child link="grasp_link" />
+    <origin xyz="0.15 0.0 0.0" rpy="0 0 0"/>
+  </joint>
+
 </robot>

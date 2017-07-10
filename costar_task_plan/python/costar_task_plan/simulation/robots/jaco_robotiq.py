@@ -60,7 +60,7 @@ class JacoRobotiqInterface(AbstractRobotInterface):
 
         self.handle = pb.loadURDF(urdf_filename)
         self.grasp_idx = self.findGraspFrame()
-        self.loadKinematicsFromURDF(urdf_filename, "base_link")
+        self.loadKinematicsFromURDF(urdf_filename, "robot_root")
 
         return self.handle
 
@@ -124,7 +124,8 @@ class JacoRobotiqInterface(AbstractRobotInterface):
     def _getArmPosition(self):
         q = [0.] * 6
         for i in xrange(6):
-            q = pb.getJointState(self.handle, i)
+            q[i] = pb.getJointState(self.handle, i)[0]
+        return q
 
     def _getGripper(self):
         return pb.getJointState(self.handle, self.left_finger)

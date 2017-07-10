@@ -1070,7 +1070,7 @@
   <!-- Create a grasp link to specify the end of the robot arm -->
   <link name="grasp_link"/>
   <joint name="ee_to_grasp_link" type="fixed">
-    <parent link="jaco6_hand_limb" />
+    <parent link="jaco_6_hand_limb" />
     <child link="grasp_link" />
     <origin xyz="0.15 0.0 0.0" rpy="0 0 0"/>
   </joint>

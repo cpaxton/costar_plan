@@ -49,11 +49,7 @@ cd $CATKIN_WS
 source /opt/ros/$ROS_DISTRO/setup.bash
 catkin init
 cd $CATKIN_WS/src
-
-#echo "======================================================"
-#echo "MOVEIT"
-#wget https://raw.githubusercontent.com/ros-planning/moveit/indigo-devel/moveit.rosinstall
-#wstool init . moveit.rosinstall
+catkin build --verbose
 
 echo "======================================================"
 echo "COSTAR"

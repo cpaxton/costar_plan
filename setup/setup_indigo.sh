@@ -11,6 +11,15 @@ export COSTAR_PLAN_DIR="$HOME/costar_ws/src/costar_plan"
 sudo apt-get update -qq
 
 echo "======================================================"
+echo "ROS"
+sudo apt-get install -y python-catkin-pkg python-rosdep python-wstool \
+  python-catkin-tools ros-$ROS_DISTRO-catkin ros-$ROS_DISTRO-ros-base
+echo "--> source ROS setup in /opt/ros/$ROS_DISTRO/setup.bash"
+source /opt/ros/$ROS_DISTRO/setup.bash
+sudo rosdep init
+rosdep update
+
+echo "======================================================"
 echo "PYTHON"
 echo "Installing python dependencies:"
 echo "Installing basics from apt-get..."
@@ -31,15 +40,6 @@ then
 else
   sudo -H pip install tensorflow
 fi
-
-echo "======================================================"
-echo "ROS"
-sudo apt-get install -y python-catkin-pkg python-rosdep python-wstool \
-  python-catkin-tools ros-$ROS_DISTRO-catkin ros-$ROS_DISTRO-ros-base
-echo "--> source ROS setup in /opt/ros/$ROS_DISTRO/setup.bash"
-source /opt/ros/$ROS_DISTRO/setup.bash
-sudo rosdep init
-rosdep update
 
 echo "======================================================"
 echo "CATKIN"

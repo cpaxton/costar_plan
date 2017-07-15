@@ -78,14 +78,7 @@ install:
   - rosdep install -y --from-paths ./ --ignore-src --rosdistro $ROS_DISTRO
   - catkin build --verbose
 
-# Install all dependencies, using wstool first and rosdep second.
-# wstool looks for a ROSINSTALL_FILE defined in the environment variables.
-before_script:
-  - cd ~/costar_ws/src
-
-# Compile and test (mark the build as failed if any step fails). If the
-# CATKIN_OPTIONS file exists, use it as an argument to catkin_make, for example
-# to blacklist certain packages.
+# Compile and test (mark the build as failed if any step fails).
 #
 # NOTE on testing: `catkin_make run_tests` will show the output of the tests
 # (gtest, nosetest, etc..) but always returns 0 (success) even if a test

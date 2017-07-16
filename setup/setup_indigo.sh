@@ -49,7 +49,8 @@ cd $CATKIN_WS
 source /opt/ros/$ROS_DISTRO/setup.bash
 catkin init
 cd $CATKIN_WS/src
-sudo apt-get install python-catkin-pkg ros-$ROS_DISTRO-catkin
+#sudo apt-get install python-catkin-pkg ros-$ROS_DISTRO-catkin
+sudo pip install catkin_pkg
 catkin build --verbose
 
 #echo "======================================================"

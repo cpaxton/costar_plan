@@ -71,7 +71,6 @@ before_install:
 # Create a catkin workspace with the package under integration.
 install:
   # Run install script
-  - sudo pip install -U catkin_pkg
   - $CI_SOURCE_PATH/setup/setup_indigo.sh
   - cd ~/costar_ws/src
   # Add the package under integration to the workspace using a symlink.

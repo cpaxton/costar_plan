@@ -19,27 +19,27 @@ source /opt/ros/$ROS_DISTRO/setup.bash
 sudo rosdep init
 rosdep update
 
-echo "======================================================"
-echo "PYTHON"
-echo "Installing python dependencies:"
-echo "Installing basics from apt-get..."
-sudo apt-get -y install python-pygame python-dev
-echo "Installing libraries and drivers..."
-sudo apt-get -y install -y build-essential autoconf libtool pkg-config python-opengl python-imaging python-pyrex python-pyside.qtopengl idle-python2.7 qt4-dev-tools qt4-designer libqtgui4 libqtcore4 libqt4-xml libqt4-test libqt4-script libqt4-network libqt4-dbus python-qt4 python-qt4-gl libgle3 python-dev libssl-dev
-sudo apt-get -y install -y libx11-dev libpq-dev python-dev libxml2-dev libxslt1-dev libldap2-dev libsasl2-dev libffi-dev mongodb
-echo "Installing smaller libraries from pip..."
-sudo -H pip install --no-binary numpy
-sudo -H pip install h5py keras keras-rl sympy matplotlib pygame gmr networkx \
-  dtw pypr gym PyPNG pybullet numba
+#echo "======================================================"
+#echo "PYTHON"
+#echo "Installing python dependencies:"
+#echo "Installing basics from apt-get..."
+#sudo apt-get -y install python-pygame python-dev
+#echo "Installing libraries and drivers..."
+#sudo apt-get -y install -y build-essential autoconf libtool pkg-config python-opengl python-imaging python-pyrex python-pyside.qtopengl idle-python2.7 qt4-dev-tools qt4-designer libqtgui4 libqtcore4 libqt4-xml libqt4-test libqt4-script libqt4-network libqt4-dbus python-qt4 python-qt4-gl libgle3 python-dev libssl-dev
+#sudo apt-get -y install -y libx11-dev libpq-dev python-dev libxml2-dev libxslt1-dev libldap2-dev libsasl2-dev libffi-dev mongodb
+#echo "Installing smaller libraries from pip..."
+#sudo -H pip install --no-binary numpy
+#sudo -H pip install h5py keras keras-rl sympy matplotlib pygame gmr networkx \
+#  dtw pypr gym PyPNG pybullet numba
 
 # TODO(cpaxton): come up with a better way to install tensorflow here. We want
 # to ensure that everything is configured properly for tests.
-if [ nvidia-smi ]
-then
-  sudo -H pip install tensorflow
-else
-  sudo -H pip install tensorflow
-fi
+#if [ nvidia-smi ]
+#then
+#  sudo -H pip install tensorflow
+#else
+#  sudo -H pip install tensorflow
+#fi
 
 echo "======================================================"
 echo "CATKIN"
@@ -52,16 +52,16 @@ cd $CATKIN_WS/src
 sudo apt-get install python-catkin-pkg ros-$ROS_DISTRO-catkin
 catkin build --verbose
 
-echo "======================================================"
-echo "COSTAR"
-git clone https://github.com/cpaxton/hrl-kdl.git  --branch indigo-devel
-git clone https://github.com/cburbridge/python_pcd.git
-git clone https://github.com/jhu-lcsr/costar_objects.git
-git clone https://github.com/cpaxton/dmp.git --branch indigo
-git clone https://github.com/cpaxton/robotiq_85_gripper.git
-#git clone https://github.com/cpaxton/costar_plan.git
-rosdep install -y --from-paths ./ --ignore-src --rosdistro $ROS_DISTRO
-cd $CATKIN_WS/src
-catkin build --verbose
+#echo "======================================================"
+#echo "COSTAR"
+#git clone https://github.com/cpaxton/hrl-kdl.git  --branch indigo-devel
+#git clone https://github.com/cburbridge/python_pcd.git
+#git clone https://github.com/jhu-lcsr/costar_objects.git
+#git clone https://github.com/cpaxton/dmp.git --branch indigo
+#git clone https://github.com/cpaxton/robotiq_85_gripper.git
+##git clone https://github.com/cpaxton/costar_plan.git
+#rosdep install -y --from-paths ./ --ignore-src --rosdistro $ROS_DISTRO
+#cd $CATKIN_WS/src
+#catkin build --verbose
 source $CATKIN_WS/devel/setup.bash
 

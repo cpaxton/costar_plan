@@ -50,6 +50,8 @@ source /opt/ros/$ROS_DISTRO/setup.bash
 catkin init
 cd $CATKIN_WS/src
 echo "======================="
+source /opt/ros/$ROS_DISTRO/setup.bash
+ls /opt/ros/indigo/lib/python2.7/dist-packages
 echo $PYTHONPATH
 python --version
 catkin build --verbose

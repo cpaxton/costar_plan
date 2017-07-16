@@ -62,6 +62,6 @@ git clone https://github.com/cpaxton/robotiq_85_gripper.git
 #git clone https://github.com/cpaxton/costar_plan.git
 rosdep install -y --from-paths ./ --ignore-src --rosdistro $ROS_DISTRO
 cd $CATKIN_WS/src
-catkin build
+catkin build --verbose
 source $CATKIN_WS/devel/setup.bash
 

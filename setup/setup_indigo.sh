@@ -49,7 +49,9 @@ cd $CATKIN_WS
 source /opt/ros/$ROS_DISTRO/setup.bash
 catkin init
 cd $CATKIN_WS/src
+echo "======================="
 echo $PYTHONPATH
+python --version
 catkin build --verbose
 
 #echo "======================================================"

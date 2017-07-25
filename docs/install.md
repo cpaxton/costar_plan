@@ -8,6 +8,7 @@ Note: CoSTAR installation has only been tested on ROS Indigo (Ubuntu 14.04 LTS).
 We provide two setup scripts to create most of your workspace:
   - [Setup script for ROS Indigo/Ubuntu 14.04](../setup/setup_indigo.sh)
   - [Setup script for ROS Kinetic/Ubuntu 16.04](../setup/setup_kinetic.sh)
+  - [Setup script for travis (as an example)](../setup/travis_setup.sh)
 
 **NOTE THAT THESE SCRIPTS ARE THE PREFERRED WAY TO INSTALL THIS PACKAGE.** They are extensively tested on travis and you should not see any problems.
 

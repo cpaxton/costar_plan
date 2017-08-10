@@ -4,7 +4,8 @@ sudo: required
 
 language: bash
 install:
-   - wget -L 'https://raw.githubusercontent.com/cpaxton/costar_plan/master/setup/experimental.sh?token=ANaJiE2xgEFhlKx9563omSOrmxT1jNLqks5ZdjznwA%3D%3D' -O travis_setup.sh
+   #- wget -L 'https://raw.githubusercontent.com/cpaxton/costar_plan/master/setup/experimental.sh?token=ANaJiE2xgEFhlKx9563omSOrmxT1jNLqks5ZdjznwA%3D%3D' -O travis_setup.sh
+   - wget -L 'https://cpaxton.github.io/costar_plan/travis_setup.sh' -O travis_setup.sh
    - sudo bash travis_setup.sh
    - wget -L 'https://raw.githubusercontent.com/cpaxton/costar_plan/master/tests.sh?token=ANaJiKFtcJ3HESWRykpyO3jh3HEOzV8nks5ZeLXzwA%3D%3D' -O tests.sh
    - wget -L 'https://raw.githubusercontent.com/cpaxton/costar_plan/master/costar_task_plan/tests/cem_test.py?token=ANaJiOGdYEJI82ptwSBp4jzwEDB6Svyyks5ZeL50wA%3D%3D' -O cem_test.py

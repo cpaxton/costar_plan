@@ -181,16 +181,17 @@ class SimulationRobotAction(AbstractAction):
     holds the tuple for arm_cmd, gripper_cmd, etc.
     '''
 
-    def __init__(self, arm_cmd=None, gripper_cmd=None, code=None):
+    def __init__(self, arm_cmd=None, gripper_cmd=None, base_cmd=None, code=None):
         self.arm_cmd = arm_cmd
         self.gripper_cmd = gripper_cmd
+        self.base_cmd = base_cmd
 
         # This is used to track which high-level action is being executed at
         # any given time.
         self.code = code
 
     def getDescription(cls):
-        return "arm_cmd", "gripper_cmd"
+        return "arm_cmd", "gripper_cmd", "base_cmd"
 
 class SimulationRobotActor(AbstractActor):
 

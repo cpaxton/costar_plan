@@ -50,6 +50,9 @@ flags.DEFINE_integer('densenet_dense_blocks', 4,
                      """The number of dense blocks in the model.""")
 flags.DEFINE_float('densenet_reduction', 0.5,
                    """DenseNet and DenseNetFCN reduction aka compression parameter.""")
+flags.DEFINE_float('densenet_reduction_after_pretrained', 0.5,
+                   """DenseNet and DenseNetFCN reduction aka compression parameter,
+                      applied to the second DenseNet component after pretrained imagenet models.""")
 flags.DEFINE_float('dropout_rate', 0.2,
                    """Dropout rate for the model during training.""")
 flags.DEFINE_string('eval_results_file', 'grasp_model_eval.txt',
@@ -87,7 +90,8 @@ class GraspTrain(object):
               learning_rate_decay_algorithm=FLAGS.learning_rate_decay_algorithm,
               learning_rate=FLAGS.grasp_learning_rate,
               learning_power_decay_rate=FLAGS.learning_rate_scheduler_power_decay_rate,
-              dropout_rate=FLAGS.dropout_rate):
+              dropout_rate=FLAGS.dropout_rate,
+              model_name=FLAGS.grasp_model):
         """Train the grasping dataset
 
         This function depends on https://github.com/fchollet/keras/pull/6928
@@ -126,7 +130,7 @@ class GraspTrain(object):
         ########################################################
         # End tensor configuration, begin model configuration and training
 
-        weights_name = timeStamped(save_weights)
+        weights_name = timeStamped(save_weights + '-' + model_name)
 
         # ###############learning rate scheduler####################
         # source: https://github.com/aurora95/Keras-FCN/blob/master/train.py
@@ -164,7 +168,7 @@ class GraspTrain(object):
         scheduler = keras.callbacks.LearningRateScheduler(lr_scheduler)
         early_stopper = EarlyStopping(monitor='acc', min_delta=0.001, patience=10)
         csv_logger = CSVLogger(weights_name + '.csv')
-        checkpoint = keras.callbacks.ModelCheckpoint(weights_name + '.epoch-{epoch:03d}-loss-{loss:.3f}-acc-{acc:.3f}.h5',
+        checkpoint = keras.callbacks.ModelCheckpoint(weights_name + '-epoch-{epoch:03d}-loss-{loss:.3f}-acc-{acc:.3f}.h5',
                                                      save_best_only=True, verbose=1, monitor='acc')
 
         callbacks = [scheduler, early_stopper, csv_logger, checkpoint]
@@ -213,7 +217,7 @@ class GraspTrain(object):
             model.fit(epochs=epochs, steps_per_epoch=steps_per_epoch, callbacks=callbacks)
         finally:
             # always try to save weights
-            final_weights_name = weights_name + '_final.h5'
+            final_weights_name = weights_name + '-final.h5'
             model.save_weights(final_weights_name)
             return final_weights_name
 
@@ -227,7 +231,8 @@ class GraspTrain(object):
              resize=FLAGS.resize,
              resize_height=FLAGS.resize_height,
              resize_width=FLAGS.resize_width,
-             eval_results_file=FLAGS.eval_results_file):
+             eval_results_file=FLAGS.eval_results_file,
+             model_name=FLAGS.grasp_model):
         """Train the grasping dataset
 
         This function depends on https://github.com/fchollet/keras/pull/6928
@@ -322,14 +327,21 @@ def main():
     K.set_session(session)
     with K.get_session() as sess:
         load_weights = FLAGS.load_weights
-        if FLAGS.grasp_model is 'grasp_model_single':
+        if FLAGS.grasp_model == 'grasp_model_pretrained':
+            def make_model_fn(*a, **kw):
+                return grasp_model.grasp_model_pretrained(
+                    growth_rate=FLAGS.densenet_growth_rate,
+                    reduction=FLAGS.densenet_reduction_after_pretrained,
+                    dense_blocks=FLAGS.densenet_dense_blocks,
+                    *a, **kw)
+        elif FLAGS.grasp_model == 'grasp_model_single':
             def make_model_fn(*a, **kw):
                 return grasp_model.grasp_model(
                     growth_rate=FLAGS.densenet_growth_rate,
                     reduction=FLAGS.densenet_reduction,
                     dense_blocks=FLAGS.densenet_dense_blocks,
                     *a, **kw)
-        elif FLAGS.grasp_model is 'grasp_model_segmentation':
+        elif FLAGS.grasp_model == 'grasp_model_segmentation':
             def make_model_fn(*a, **kw):
                 return grasp_model.grasp_model_segmentation(
                     growth_rate=FLAGS.densenet_growth_rate,
@@ -344,12 +356,14 @@ def main():
         if 'train' in FLAGS.pipeline_stage:
             print('Training ' + FLAGS.grasp_model)
             load_weights = gt.train(make_model_fn=make_model_fn,
-                                    load_weights=load_weights)
+                                    load_weights=load_weights,
+                                    model_name=FLAGS.grasp_model)
         if 'eval' in FLAGS.pipeline_stage:
             print('Evaluating ' + FLAGS.grasp_model + ' on weights ' + load_weights)
             # evaluate using weights that were just computed, if available
             gt.eval(make_model_fn=make_model_fn,
-                    load_weights=load_weights)
+                    load_weights=load_weights,
+                    model_name=FLAGS.grasp_model)
 
 
 if __name__ == '__main__':

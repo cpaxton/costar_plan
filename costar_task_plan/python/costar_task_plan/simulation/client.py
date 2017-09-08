@@ -167,6 +167,17 @@ class CostarBulletSimulation(object):
 
         # place the robot in the world and set up the task
         self.task.setup()
+        
+    def convertToArmandGripperCmd(self, action):
+        
+        #TODO: fix the hard coded indices
+        arm = action[0:6]
+        gripper = action[5:6]
+      
+        
+        return (arm,gripper)
+
+        
 
     def convertToArmandGripperCmd(self, action):
         '''
@@ -212,7 +223,7 @@ class CostarBulletSimulation(object):
             
             if type(action) is not tuple:
                 action = self.convertToArmandGripperCmd(action)
-            action = SimulationRobotAction(*action)
+           action = SimulationRobotAction(*action)
 
         # Get state, action, features, reward from update
         (ok, S0, A0, S1, F1, reward) = self.task.world.tick(action)
@@ -241,7 +252,6 @@ class CostarBulletSimulation(object):
                     plt.imsave(path3, mask)
 
         # Return world information
-       
         return F1, reward, not ok, {}
 
     def close(self):

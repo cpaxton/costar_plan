@@ -87,7 +87,15 @@ def GetSimulationParser():
                              " training data sets.",
                         action="store_true")
     return parser
+    
 
 def ParseBulletArgs():
     parser = GetSimulationParser()
+    return vars(parser.parse_args())
+    
+def ParseGazeboArgs():
+    parser = GetSimulationParser()
+    parser.add_argument('--launch',
+                        help="ROS launch file to start Gazebo simulation",
+                        default="ur5.launch")
     return vars(parser.parse_args())

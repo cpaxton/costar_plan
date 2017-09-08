@@ -5,6 +5,8 @@ from costar_task_plan.simulation.reward import *
 from costar_task_plan.simulation.condition import *
 
 import pybullet as pb
+from costar_task_plan.simulation.camera import Camera
+
 
 
 class ExploreTaskDefinition(AbstractTaskDefinition):
@@ -22,6 +24,16 @@ class ExploreTaskDefinition(AbstractTaskDefinition):
         objects.
         '''
         super(ExploreTaskDefinition, self).__init__(*args, **kwargs)
+        self.addCamera(
+            #Camera("right", [-0.5, 0., 0.15], distance=0.7, roll=0.0,
+        #Camera("top", [-0.4, 0., 0.25], distance=0.7, roll=0.0,
+        Camera("top", [-0.0, 0., 1.00], distance=0.7, roll=0.0,
+                image_width=64,
+                image_height=64,
+                pitch=-90,
+                yaw=0,
+                fov=40))
+
 
     def _setup(self):
         '''

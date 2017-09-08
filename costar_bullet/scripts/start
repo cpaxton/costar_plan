@@ -25,3 +25,12 @@ if __name__ == '__main__':
         cProfile.run('main(args)')
     else:
         main(args)
+    env = BulletSimulationEnv(**args)
+    if 'agent' in args and args['agent'] is not None:
+        agent = MakeAgent(env, args['agent'], **args)    
+        agent.fit()
+        print "========================"
+        print "...done."
+
+    while True:
+        time.sleep(0.1)

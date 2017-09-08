@@ -26,7 +26,6 @@ class KerasDDPGAgent(AbstractAgent):
         observation = env.reset()
         
         print ">>>>>>>>>>>>>>>>>>>", observation.shape
-       
 
         # TODO: find a way to customize network
         actor = Sequential()

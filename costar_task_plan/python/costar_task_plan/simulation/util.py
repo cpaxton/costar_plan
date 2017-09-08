@@ -22,7 +22,7 @@ def GetAvailableTasks():
 
 
 def GetAvailableRobots():
-    return ["jaco", "ur5_2_finger", "ur5", "ur5_robotiq", "turtlebot"]
+    return ["jaco", "ur5_2_finger", "ur5", "ur5_robotiq", "turtlebot", "husky"]
 
 
 def GetAvailableAlgorithms():

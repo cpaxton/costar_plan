@@ -31,7 +31,7 @@ class GazeboEnv(gym.Env):
         if launchfile.startswith("/"):
             fullpath = launchfile
         else:
-            fullpath = os.path.join(os.path.dirname(__file__), "assets","launch", launchfile)
+            fullpath = os.path.join(os.path.dirname(__file__), "../../../../costar_simulation/launch", launchfile)
         if not path.exists(fullpath):
             raise IOError("File "+fullpath+" does not exist")
 

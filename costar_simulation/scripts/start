@@ -15,6 +15,11 @@ import subprocess
 import sys
 import time
 
+from costar_task_plan.gym import GazeboEnv
+
+from costar_task_plan.simulation import ParseGazeboArgs
+
+
 class CostarSimulation(object):
     '''
     Creates and manages a gazebo simulation. Start this with:
@@ -170,13 +175,13 @@ class CostarSimulation(object):
         sys.exit(0)
 
 if __name__ == '__main__':
-    sim = CostarSimulation()
-    signal.signal(signal.SIGINT, sim.shutdownAndExitHandler)
-    try:
-        sim.run()
-    except Exception, e:
-        sim.shutdown()
-        raise e
-        sys.exit(-1)
-    signal.pause()
+    args = ParseGazeboArgs()
+    if 'launch' in args and args['launch'] is not None:
+        print args['launch']
+        env = GazeboEnv(args['launch'])
+
+    #sim = CostarSimulation(args) # verify with chris, this looks depricated
+
+   
+    
 

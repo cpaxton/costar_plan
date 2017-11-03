@@ -68,7 +68,7 @@ flags.DEFINE_string('eval_results_file', 'grasp_model_eval.txt',
 					"""Save a file with results of model evaluation.""")
 flags.DEFINE_string('device', '/gpu:0',
 					"""Save a file with results of model evaluation.""")
-flags.DEFINE_string('datataset_batch_representation','constant'
+flags.DEFINE_string('datataset_batch_representation','constant',
 					"""Use default batch if constant, otherwise proportional""")
 flags.DEFINE_bool('tf_allow_memory_growth', True,
 				  """False if memory usage will be allocated all in advance
@@ -146,7 +146,6 @@ class GraspTrain(object):
 			batch_each_dataset.append(data.get_features()[1])
 
 		max_batch_size = max(batch_each_dataset)
-        min_batch_size = min(batch_each_dataset)
 		
 		for single_dataset, single_batch in zip(datasets_list, batch_each_dataset):
 			prop_size = batch_size
@@ -160,9 +159,9 @@ class GraspTrain(object):
 			 example_batch_size,
 			 grasp_success_op,
 			 num_samples) = data.single_pose_training_tensors(batch_size=prop_size,
-													imagenet_mean_subtraction=imagenet_mean_subtraction,
-															  random_crop=random_crop,
-															  resize=resize,
+			 imagenet_mean_subtraction=imagenet_mean_subtraction,
+			 random_crop=random_crop,
+			 resize=resize,
 															  grasp_sequence_min_time_step=grasp_sequence_min_time_step,
 															  grasp_sequence_max_time_step=grasp_sequence_max_time_step)
 			max_num_samples = max(num_samples, max_num_samples)

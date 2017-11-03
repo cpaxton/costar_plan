@@ -162,8 +162,8 @@ class GraspTrain(object):
 			 imagenet_mean_subtraction=imagenet_mean_subtraction,
 			 random_crop=random_crop,
 			 resize=resize,
-															  grasp_sequence_min_time_step=grasp_sequence_min_time_step,
-															  grasp_sequence_max_time_step=grasp_sequence_max_time_step)
+			 grasp_sequence_min_time_step=grasp_sequence_min_time_step,
+			 grasp_sequence_max_time_step=grasp_sequence_max_time_step)
 			max_num_samples = max(num_samples, max_num_samples)
 			pregrasp_op_batch.append(pregrasp_op)
 			grasp_step_op_batch.append(grasp_step_op)

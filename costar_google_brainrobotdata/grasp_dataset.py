@@ -900,7 +900,6 @@ class GraspDataset(object):
                      base_to_endeffector_op, final_base_to_endeffector_transform_op],
                      # return type data formats to expect
                     [tf.float32] * 14,
-                    # TODO(ahundt) set stateful=False once bugs are fixed
                     stateful=False, name='py_func/grasp_dataset_to_transforms_and_features')
 
                 # define pixel image coordinate as an integer type
@@ -934,7 +933,6 @@ class GraspDataset(object):
                     'endeffector_clear_view_depth_pixel_T_endeffector/image_coordinate/xy_2',
                     batch_i, time_step_j)
 
-                # TODO(ahundt) make sure these feature names fit in nicely with get_time_ordered_features
                 # depth_pixel_T_endeffector_final_vec_quat_7_array,
                 add_feature_op(
                     fixed_feature_op_dict, features_complete_list, time_ordered_feature_name_dict,
@@ -1662,7 +1660,7 @@ class GraspDataset(object):
 
            # Returns
 
-               (pregrasp_op_batch, grasp_step_op_batch, simplified_grasp_command_op_batch, example_batch_size, grasp_success_op_batch, num_samples)
+               (pregrasp_op_batch, grasp_step_op_batch, simplified_grasp_command_op_batch, grasp_success_op_batch, example_batch_size, num_samples)
         """
         # Get tensors that load the dataset from disk plus features calculated from the raw data, including transforms and point clouds
         feature_op_dicts, features_complete_list, time_ordered_feature_name_dict, num_samples = self.get_training_dictionaries(
@@ -1712,7 +1710,7 @@ class GraspDataset(object):
         grasp_success_op_batch = tf.concat(grasp_success_op_batch, 0)
         # add one extra dimension so they match
         grasp_success_op_batch = tf.expand_dims(grasp_success_op_batch, -1)
-        return pregrasp_op_batch, grasp_step_op_batch, simplified_grasp_command_op_batch, example_batch_size, grasp_success_op_batch, num_samples
+        return pregrasp_op_batch, grasp_step_op_batch, simplified_grasp_command_op_batch, grasp_success_op_batch, example_batch_size, num_samples
 
     def npy_to_gif(self, npy, filename, fps=2):
         """Convert a numpy array into a gif file at the location specified by filename.

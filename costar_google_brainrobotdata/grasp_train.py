@@ -11,15 +11,19 @@ from keras.callbacks import ReduceLROnPlateau
 from keras.callbacks import CSVLogger
 from keras.callbacks import EarlyStopping
 from keras.callbacks import ModelCheckpoint
+from keras.callbacks import TensorBoard
 
 from tensorflow.python.platform import flags
 
 import grasp_dataset
 import grasp_model
 
+from keras_tqdm import TQDMCallback  # Keras tqdm progress bars https://github.com/bstriner/keras-tqdm
+
 flags.DEFINE_string('learning_rate_decay_algorithm', 'power_decay',
                     """Determines the algorithm by which learning rate decays,
-                       options are power_decay, exp_decay, adam and progressive_drops""")
+                       options are power_decay, exp_decay, adam and progressive_drops.
+                       Only applies with optimizer flag is SGD""")
 flags.DEFINE_string('grasp_model', 'grasp_model_single',
                     """Choose the model definition to run, options are grasp_model and grasp_model_segmentation""")
 flags.DEFINE_string('save_weights', 'grasp_model_weights',
@@ -34,10 +38,13 @@ flags.DEFINE_string('grasp_datasets_train', '062_b,063,072_a,082_b,102',
                     totaling 513,491 grasp attempts.
                     See https://sites.google.com/site/brainrobotdata/home
                     for a full listing.""")
-flags.DEFINE_string('grasp_datasets_batch_algorithm','constant',
+flags.DEFINE_string('grasp_datasets_batch_algorithm', 'proportional',
                     """Use default batch if constant,
-                    'constant' training on multiple datasets reads `batch_size` elements from each dataset at each training step when this parameter.
-                    'proportional' each dataset's batch size will be individually set to int(batch_size*single_batch/max_batch_size) so smaller datasets are run more slowly than larger datasets.""")
+                    'constant' training on multiple datasets reads `batch_size`
+                        elements from each dataset at each training step when this parameter.
+                    'proportional' each dataset's batch size will be individually
+                        set to int(batch_size*single_batch/max_batch_size)
+                        so smaller datasets are run more slowly than larger datasets.""")
 flags.DEFINE_string('grasp_dataset_eval', '097',
                     """Filter the subset of 1TB Grasp datasets to evaluate.
                     None by default. 'all' will run all datasets in data_dir.
@@ -79,6 +86,14 @@ flags.DEFINE_bool('tf_allow_memory_growth', True,
                   """False if memory usage will be allocated all in advance
                      or True if it should grow as needed. Allocating all in
                      advance may reduce fragmentation.""")
+flags.DEFINE_string('learning_rate_scheduler', None,
+                    """Options are None and learning_rate_scheduler,
+                       turning this on activates the scheduler which follows
+                       a power decay path for the learning rate over time.
+                       This is most useful with SGD, currently disabled with Adam.""")
+flags.DEFINE_string('optimizer', "Adam", "Options are Adam and SGD.")
+flags.DEFINE_string('progress_tracker', 'tensorboard',
+                    """Utility to follow training progress, options are tensorboard and None.""")
 
 flags.FLAGS._parse_flags()
 FLAGS = flags.FLAGS
@@ -162,8 +177,8 @@ class GraspTrain(object):
             # list of dictionaries the length of batch_size
             (pregrasp_op, grasp_step_op,
              simplified_grasp_command_op,
-             example_batch_size,
              grasp_success_op,
+             example_batch_size,
              num_samples) = data.get_training_tensors(batch_size=proportional_batch_size,
                                                       imagenet_mean_subtraction=imagenet_mean_subtraction,
                                                       random_crop=random_crop,
@@ -201,6 +216,7 @@ class GraspTrain(object):
         # learning_rate = 0.1
         # learning_power_decay_rate = 2
         # print([learning_rate * ((1 - float(epoch)/epochs) ** learning_power_decay_rate) for epoch in np.arange(epochs)])
+
         def lr_scheduler(epoch, learning_rate=learning_rate,
                          mode=learning_rate_decay_algorithm,
                          epochs=epochs,
@@ -232,14 +248,21 @@ class GraspTrain(object):
 
             print('lr: %f' % lr)
             return lr
+
+        callbacks = []
         scheduler = keras.callbacks.LearningRateScheduler(lr_scheduler)
         early_stopper = EarlyStopping(monitor='acc', min_delta=0.001, patience=10)
         csv_logger = CSVLogger(weights_name + '.csv')
         checkpoint = keras.callbacks.ModelCheckpoint(weights_name + '-epoch-{epoch:03d}-loss-{loss:.3f}-acc-{acc:.3f}.h5',
                                                      save_best_only=True, verbose=1, monitor='acc')
+        progress_bar = TQDMCallback()
 
-        callbacks = [scheduler, early_stopper, csv_logger, checkpoint]
+        callbacks = callbacks + [early_stopper, csv_logger, checkpoint, progress_bar]
 
+        if FLAGS.progress_tracker is 'tensorboard':
+            progress_tracker = TensorBoard(log_dir='./' + weights_name, write_graph=True,
+                                           write_grads=True, write_images=True,
+                                           embeddings_freq=10, embeddings_layer_names=None, embeddings_metadata=None)
         # Will need to try more things later.
         # Nadam parameter choice reference:
         # https://github.com/tensorflow/tensorflow/pull/9175#issuecomment-295395355
@@ -248,11 +271,18 @@ class GraspTrain(object):
         # optimizer = keras.optimizers.Nadam(lr=0.03, beta_1=0.825, beta_2=0.99685)
 
         # 2017-08-28 trying SGD
-        optimizer = keras.optimizers.SGD(lr=learning_rate)
+        # 2017-12-18 SGD worked very well and has been the primary training optimizer from 2017-09 to 2017-12
+        if FLAGS.optimizer is 'SGD':
+            optimizer = keras.optimizers.SGD(lr=learning_rate)
+            callbacks = callbacks + [scheduler]
 
-        # 2017-08-27
-        # Tried NADAM for a while with the settings below, only improved for first 2 epochs.
+        # 2017-08-27 Tried NADAM for a while with the settings below, only improved for first 2 epochs.
         # optimizer = keras.optimizers.Nadam(lr=0.004, beta_1=0.825, beta_2=0.99685)
+
+        # 2017-12-18
+        # Try ADAM with AMSGrad
+        if FLAGS.optimizer is 'Adam':
+            optimizer = keras.optimizers.Adam(amsgrad=True)
 
         # create the model
         model = make_model_fn(
@@ -280,12 +310,11 @@ class GraspTrain(object):
         # make sure we visit every image once
         steps_per_epoch = int(np.ceil(float(max_num_samples)/float(batch_size)))
 
-        model.fit(epochs=epochs, steps_per_epoch=steps_per_epoch, callbacks=callbacks)
-        final_weights_name = weights_name + '-final.h5'
-        model.save_weights(final_weights_name)
         try:
             model.fit(epochs=epochs, steps_per_epoch=steps_per_epoch, callbacks=callbacks)
-        except Exception as e:
+            final_weights_name = weights_name + '-final.h5'
+            model.save_weights(final_weights_name)
+        except (Exception, KeyboardInterrupt) as e:
             # always try to save weights
             final_weights_name = weights_name + '-autosaved-on-exception.h5'
             model.save_weights(final_weights_name)

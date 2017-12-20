@@ -37,6 +37,7 @@ import grasp_geometry_tf
 import depth_image_encoding
 import random_crop_parameters as rcp
 
+# DATASET LOADING CONFIGURATION COMMAND LINE PARAMETERS, see GraspDataset()
 flags.DEFINE_string('data_dir',
                     os.path.join(os.path.expanduser("~"),
                                  '.keras', 'datasets', 'grasping'),
@@ -158,6 +159,29 @@ flags.DEFINE_string('grasp_success_label', 'move_to_grasp/time_ordered/grasp_suc
                             adjusted by a weight centered on the final gripper position in the image frame.
                             (Not yet implemented.)
                     """)
+
+# MULTI DATASET AGGREGATION PARAMETERS, see get_multi_dataset_training_tensors()
+flags.DEFINE_string('grasp_datasets_train', '062_b,063,072_a,082_b,102',
+                    """Filter multiple subsets of 1TB Grasp datasets to train.
+
+                    For use with get_multi_dataset_training_tensors() when training
+                    multiple datasets simultaneously.
+
+                    Comma separated list 062_b,063,072_a,082_b,102 by default,
+                    totaling 513,491 grasp attempts.
+                    See https://sites.google.com/site/brainrobotdata/home
+                    for a full listing.""")
+flags.DEFINE_string('grasp_datasets_batch_algorithm', 'proportional',
+                    """Use default batch size for each dataset if constant.
+
+                    For use with get_multi_dataset_training_tensors() when training
+                    multiple datasets simultaneously.
+
+                    'constant' training on multiple datasets reads `batch_size`
+                        elements from each dataset at each training step when this parameter.
+                    'proportional' each dataset's batch size will be individually
+                        set to int(batch_size*single_batch/max_batch_size)
+                        so smaller datasets are run more slowly than larger datasets.""")
 
 FLAGS = flags.FLAGS
 
@@ -1647,7 +1671,7 @@ class GraspDataset(object):
                              grasp_sequence_max_time_step=FLAGS.grasp_sequence_max_time_step,
                              grasp_sequence_min_time_step=FLAGS.grasp_sequence_min_time_step,
                              seed=None):
-        """Get tensors configured for training on grasps.
+        """Get tensors configured for training on grasps from a single dataset.
 
             TODO(ahundt) 2017-12-05 update get_training_tensors docstring, now expects 'move_to_grasp/time_ordered/' feature strings.
 
@@ -1734,12 +1758,6 @@ class GraspDataset(object):
         grasp_step_op_batch = tf.parallel_stack(grasp_step_op_batch)
         simplified_grasp_command_op_batch = tf.parallel_stack(simplified_grasp_command_op_batch)
         grasp_success_op_batch = tf.parallel_stack(grasp_success_op_batch)
-
-        # combine all the data into large batch tensors
-        pregrasp_op_batch = tf.concat(pregrasp_op_batch, 0)
-        grasp_step_op_batch = tf.concat(grasp_step_op_batch, 0)
-        simplified_grasp_command_op_batch = tf.concat(simplified_grasp_command_op_batch, 0)
-        grasp_success_op_batch = tf.concat(grasp_success_op_batch, 0)
 
         return pregrasp_op_batch, grasp_step_op_batch, simplified_grasp_command_op_batch, grasp_success_op_batch, num_samples
 
@@ -1844,10 +1862,164 @@ class GraspDataset(object):
                 self.npy_to_gif(video, gif_path)
 
 
+def get_multi_dataset_training_tensors(
+        datasets=FLAGS.grasp_datasets_train,
+        batch_size=FLAGS.batch_size,
+        imagenet_mean_subtraction=FLAGS.imagenet_mean_subtraction,
+        grasp_sequence_min_time_step=FLAGS.grasp_sequence_min_time_step,
+        grasp_sequence_max_time_step=FLAGS.grasp_sequence_max_time_step,
+        random_crop=FLAGS.random_crop,
+        resize=FLAGS.resize,
+        resize_height=FLAGS.resize_height,
+        resize_width=FLAGS.resize_width,
+        grasp_datasets_batch_algorithm='constant'):
+    """Aggregate multiple datasets into combined training tensors.
+
+    # TODO(ahundt) parameterize this function properly, don't just use FLAGS defaults in get_training_tensors
+
+    The Grasping data is divided into multiple datasets with varying numbers
+    of features. In particular, individually each dataset has a fixed number
+    of time steps, but the number of time steps varies between datasets.
+    Each dataset is named based on the number of features it contains.
+
+    This function aggregates these datasets such that a 'batch' is number
+    of grasp examples, and a 'minibatch' is the number of time steps
+    in one grasp example.
+
+    The number of training samples per step for a single dataset will be:
+
+    samples_per_step_for_one_dataset = (minibatch size * batch size)
+
+    The total number of training samples per step for multiple datsets is
+    the sum of the samples per step in each dataset:
+
+    samples_per_step_for_all_datasets = sum(list_of_samples_per_step_for_one_dataset)
+
+    Dataset 102 has 10 time steps, for example,
+    and dataset 097 (used for eval) has 9 time steps. This means
+    a batch size of 5 with the 'constant' training algorithm
+    will mean dataset 102 has  10 * batch size
+    5 = 50 individual training time step samples per step,
+    and 097 will have 9  * 5 = 45
+
+    # Arguments
+
+    datasets:
+        datasets parameter must be a list of strings or a
+        comma separated string identifying the datasets to load
+        such as 062_b,063,072_a,082_b,102.
+        see FLAGS.grasp_datasets_train
+    grasp_datasets_batch_algorithm: Use default batch if constant.
+        'constant' training on multiple datasets reads `batch_size`
+            elements from each dataset at each training step when this parameter.
+        'proportional' each dataset's batch size will be individually
+            set to int(batch_size*single_batch/max_batch_size)
+            so smaller datasets are run more slowly than larger datasets.
+
+    Note that one limitation of this setup is that we will
+    iterate over samples according to the largest dataset,
+    which means we see smaller datasets more than once in
+    a single epoch. Try not to aggregate a very small dataset
+    with a very large one with 'constant' batch algorithm or a small
+    batch size and the 'proportional' algorithm!
+
+    # Returns
+
+    Time-aligned list of data tensors of equal batch size for training on multiple datasets simultaneously.
+
+    [pregrasp_op_batch,
+     grasp_step_op_batch,
+     simplified_grasp_command_op_batch,
+     grasp_success_op_batch,
+     steps_per_epoch]
+
+    pregrasp_op_batch:
+        4d [batch, height, width, channels]
+        rgb image feature tensor containing the clear view scene.
+    grasp_step_op_batch:
+        4d [batch, height, width, channels] rgb image feature tensor
+        containing the current time step's scene (gripper visible).
+    simplified_grasp_command_op_batch:
+        2d [batch, channels] feature tensor containing the
+        "proposed" command which the network should evaluate.
+        this parameter is configurable based on the
+        FLAGS.grasp_sequence_motion_command_feature command line parameter
+    grasp_success_op_batch:
+        2d [batch, 1] tensor containing labels,
+        including a 1 if the grasp attempt succeeded
+        and a 0 if the grasp attempt failed.
+    steps_per_epoch:
+        A python integer with the number of steps to traverse
+        the largest of the aggregated datasets once.
+        This means that not all datasets will be covered at a perfectly equal pace.
+
+    """
+    if (grasp_datasets_batch_algorithm != 'constant' and grasp_datasets_batch_algorithm != 'proportional'):
+        raise ValueError('grasp_datasets_batch_algorithm string value must be either constant or proportional.')
+
+
+    if isinstance(datasets, str):
+        datasets = dataset.split(',')
+    elif not isinstance(datasets, list):
+        raise ValueError('datasets parameter must be a list or a comma separated string such as 062_b,063,072_a,082_b,102.')
+    max_num_samples = 0
+    grasp_datasets = []
+    pregrasp_op_batch = []
+    grasp_step_op_batch = []
+    # simplified_network_grasp_command_op
+    simplified_grasp_command_op_batch = []
+    grasp_success_op_batch = []
+
+    dataset_batch_sizes = []
+    grasp_dataset_list = []
+
+    # initialize all datasets
+    for single_dataset in datasets:
+        data = grasp_dataset.GraspDataset(dataset=single_dataset)
+        grasp_dataset_list.append(data)
+        dataset_batch_sizes.append(data.get_features()[1])
+
+    max_batch_size = max(dataset_batch_sizes)
+    # Not sure why any thing assigned to max_batch_size, it can pass
+    for single_dataset, single_batch in zip(grasp_dataset_list, tqdm(dataset_batch_sizes, desc='load_selected_datasets')):
+        proportional_batch_size = batch_size
+        if(grasp_datasets_batch_algorithm == 'proportional'):
+            proportional_batch_size = int(batch_size * single_batch / max_batch_size)
+        data = single_dataset
+        # list of dictionaries the length of batch_size
+        (pregrasp_op,
+         grasp_step_op,
+         simplified_grasp_command_op,
+         grasp_success_op,
+         num_samples) = data.get_training_tensors(
+             batch_size=proportional_batch_size,
+             imagenet_mean_subtraction=imagenet_mean_subtraction,
+             random_crop=random_crop,
+             resize=resize,
+             grasp_sequence_min_time_step=grasp_sequence_min_time_step,
+             grasp_sequence_max_time_step=grasp_sequence_max_time_step)
+
+        max_num_samples = max(num_samples, max_num_samples)
+        pregrasp_op_batch.extend(pregrasp_op)
+        grasp_step_op_batch.extend(grasp_step_op)
+        simplified_grasp_command_op_batch.extend(simplified_grasp_command_op)
+        grasp_success_op_batch.extend(grasp_success_op)
+        # make sure we visit every image once
+
+    steps_per_epoch = int(np.ceil(float(max_num_samples)/float(batch_size)))
+
+    pregrasp_op_batch = tf.concat(pregrasp_op_batch, 0)
+    grasp_step_op_batch = tf.concat(grasp_step_op_batch, 0)
+    simplified_grasp_command_op_batch = tf.concat(simplified_grasp_command_op_batch, 0)
+    print('grasp_success_op_batch before concat: ', grasp_success_op_batch)
+    grasp_success_op_batch = tf.concat(grasp_success_op_batch, 0)
+    print('grasp_success_op_batch after concat: ', grasp_success_op_batch)
+
+    return pregrasp_op_batch, grasp_step_op_batch, simplified_grasp_command_op_batch, grasp_success_op_batch, steps_per_epoch
+
 if __name__ == '__main__':
     with tf.Session() as sess:
         gd = GraspDataset()
         if FLAGS.grasp_download:
             gd.download(dataset=FLAGS.grasp_dataset)
         gd.create_gif(sess)
-

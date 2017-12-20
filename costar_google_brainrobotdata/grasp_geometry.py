@@ -30,7 +30,7 @@ except ImportError:
 
 from skimage.draw import circle_perimeter_aa  # Image drawing algorithms http://scikit-image.org
 from skimage.draw import set_color  # Image drawing algorithms http://scikit-image.org
-# from numba import jit
+from numba import jit
 
 
 def vector_quaternion_array_to_ptransform(vector_quaternion_array, q_inverse=True, t_inverse=False, pt_inverse=False):
@@ -166,7 +166,7 @@ def vector_to_ptransform(XYZ):
     return ptransform
 
 
-# @jit(nopython=True)
+@jit(nopython=True)
 def depth_image_to_point_cloud_numba(depth, depth_shape, intrinsics_matrix, XYZ):
     fx = intrinsics_matrix[0, 0]
     fy = intrinsics_matrix[1, 1]

@@ -65,7 +65,7 @@ flags.DEFINE_integer('random_crop_width', 560,
                      """Width to randomly crop images, if enabled""")
 flags.DEFINE_integer('random_crop_height', 448,
                      """Height to randomly crop images, if enabled""")
-flags.DEFINE_boolean('random_crop', False,
+flags.DEFINE_boolean('random_crop', True,
                      """random_crop will apply the tf random crop function with
                         the parameters specified by random_crop_width and random_crop_height
                      """)
@@ -73,7 +73,7 @@ flags.DEFINE_integer('resize_width', 80,
                      """Width to resize images before prediction, if enabled.""")
 flags.DEFINE_integer('resize_height', 64,
                      """Height to resize images before prediction, if enabled.""")
-flags.DEFINE_boolean('resize', False,
+flags.DEFINE_boolean('resize', True,
                      """resize will resize the input images to the desired dimensions specified but the
                         resize_width and resize_height flags. It is suggested that an exact factor of 2 be used
                         relative to the input image directions if random_crop is disabled or the crop dimensions otherwise.
@@ -111,18 +111,18 @@ flags.DEFINE_string('grasp_sequence_motion_command_feature', 'move_to_grasp/time
 =======
 flags.DEFINE_string(
     'grasp_sequence_motion_command_feature',
-    'move_to_grasp/time_ordered/reached_pose/transforms/endeffector_current_T_endeffector_final/vec_quat_7',
+    'move_to_grasp/time_ordered/reached_pose/transforms/endeffector_current_T_endeffector_final/vec_sin_cos_5',
     """Different ways of representing the motion vector parameter.
-       'move_to_grasp/time_ordered/reached_pose/transforms/endeffector_current_T_endeffector_final/vec_quat_7'
-           transform from the current endeffector pose to the final endeffector pose.
-       'final_pose_orientation_quaternion' directly input the final pose translation and orientation.
-       'next_timestep' input the params for the command saved in the dataset with translation,
-           sin theta, cos theta from the current time step to the next.
-       'endeffector_current_T_endeffector_final_vec_sin_cos_5' use
+       'move_to_grasp/time_ordered/reached_pose/transforms/endeffector_current_T_endeffector_final/vec_sin_cos_5'
            the real reached gripper pose of the end effector to calculate
            the transform from the current time step to the final time step
            to generate the parameters defined in https://arxiv.org/abs/1603.02199,
            consisting of [x,y,z, sin(theta), cos(theta)].
+       'move_to_grasp/time_ordered/reached_pose/transforms/endeffector_current_T_endeffector_final/vec_quat_7'
+           transform from the current endeffector pose to the final endeffector pose.
+       'final_pose_orientation_quaternion' directly input the final pose translation and orientation.
+       'next_timestep' input the params for the command saved in the dataset with translation,
+           sin theta, cos theta from the current time step to the next
        'endeffector_current_T_endeffector_final_vec_quat_7' use
            the real reached gripper pose of the end effector to calculate
            the transform from the current time step to the final time step
@@ -1008,11 +1008,11 @@ class GraspDataset(object):
                     'endeffector_final_clear_view_depth_pixel_T_endeffector_final/sin_cos_2',
                     batch_i, time_step_j)
 
-                # vec_sin_cos_5,
+                #  eectf_vec_quat_7_array, aka endeffector_current_T_endeffector_final
                 add_feature_op(
                     fixed_feature_op_dict, features_complete_list, time_ordered_feature_name_dict,
                     vec_sin_cos_5, [5],
-                    'endeffector_final_clear_view_depth_pixel_T_endeffector_final/vec_sin_cos_5',
+                    'endeffector_current_T_endeffector_final/vec_sin_cos_5',
                     batch_i, time_step_j)
 
                 # delta_depth_sin_cos_3,

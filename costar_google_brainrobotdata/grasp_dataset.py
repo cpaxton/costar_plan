@@ -10,6 +10,7 @@ License: Apache v2 https://www.apache.org/licenses/LICENSE-2.0
 import os
 import errno
 import traceback
+import itertools
 import six
 
 import numpy as np

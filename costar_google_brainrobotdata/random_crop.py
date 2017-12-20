@@ -22,7 +22,7 @@ def random_crop_offset(input_shape, output_shape, seed=None, name=None):
             See tf.set_random_seed for behavior.
         name: A name for this operation.
     """
-    with tf.name_scope(name, "random_crop_parameters",
+    with tf.name_scope(name, "random_crop",
                        [input_shape, output_shape]) as name:
         input_shape = ops.convert_to_tensor(
             input_shape, dtype=dtypes.int32, name="input_shape")

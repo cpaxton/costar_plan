@@ -1,6 +1,6 @@
 import tensorflow as tf
 import keras.backend as K
-import random_crop_parameters as rcp
+import random_crop as rcp
 import numpy as np
 
 

@@ -35,7 +35,7 @@ from tensorflow.python.keras.utils import Progbar
 import grasp_geometry
 import grasp_geometry_tf
 import depth_image_encoding
-import random_crop_parameters as rcp
+import random_crop as rcp
 
 # DATASET LOADING CONFIGURATION COMMAND LINE PARAMETERS, see GraspDataset()
 flags.DEFINE_string('data_dir',

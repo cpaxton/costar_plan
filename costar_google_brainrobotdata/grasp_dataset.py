@@ -1375,13 +1375,23 @@ class GraspDataset(object):
         features: list of strings, or dict where keys are strings and values are lists of strings
 
         # Returns
-
+        If 'features' is a str:
+            list of list of tensors, one for each dictionary in 'feature_op_dicts'.
         If 'features' is a list:
             list of list of tensors, one for each dictionary in 'feature_op_dicts'.
         If 'features' is a dict:
             list of dicts from strings to tensors, one for each dictionary in 'feature_op_dicts'.
         """
-        if isinstance(features, dict):
+        if isinstance(features, str):
+            # motion commands, such as pose or transform features
+            if motion_command_feature not in feature_op_dicts[0]:
+                features = [k for k, v in six.iteritems(feature_op_dicts[0])]
+                raise ValueError('unknown feature selected: {}'.format(motion_command_feature) +
+                                 ' Available features include: ' + str(features))
+            # TODO(ahundt): follow the time step range limits again [grasp_sequence_min_time_step:grasp_sequence_max_time_step]
+            simplified_op_list = [t_o_dict[motion_command_feature] for t_o_dict in feature_op_dicts]
+            return simplified_op_list
+        elif isinstance(features, dict):
             list_of_tensor_dicts = []
 
             if isinstance(feature_op_dicts, list):
@@ -1692,37 +1702,17 @@ class GraspDataset(object):
         time_ordered_feature_tensor_dicts = GraspDataset._to_tensors(feature_op_dicts, time_ordered_feature_name_dict)
 
         # motion commands, such as pose or transform features
-        if motion_command_feature not in time_ordered_feature_tensor_dicts[0]:
-            features = [k for k, v in six.iteritems(time_ordered_feature_tensor_dicts[0])]
-            raise ValueError('get_training_tensors(): unknown grasp_sequence_motion_command_feature selected: {}'.format(motion_command_feature) +
-                             ' Available features include: ' + str(features))
-        # TODO(ahundt): follow the time step range limits again [grasp_sequence_min_time_step:grasp_sequence_max_time_step]
-        simplified_grasp_command_op_batch = [t_o_dict[motion_command_feature] for t_o_dict in time_ordered_feature_tensor_dicts]
+        simplified_grasp_command_op_batch = self.to_tensors(time_ordered_feature_tensor_dicts, motion_command_feature)
 
         # image of a clear scene view, originally from 'view_clear_scene' step,
         # There is also a move_to_grasp versions copied from view_clear_scene then repeated once for each time step.
-        if clear_view_image_feature not in time_ordered_feature_tensor_dicts[0]:
-            features = [k for k, v in six.iteritems(time_ordered_feature_tensor_dicts[0])]
-            raise ValueError('get_training_tensors(): unknown clear_view_image_feature selected: {}'.format(image_feature) +
-                             ' Available features include: ' + str(features))
-        # TODO(ahundt): follow the time step range limits again [grasp_sequence_min_time_step:grasp_sequence_max_time_step]
-        pregrasp_op_batch = [t_o_dict[clear_view_image_feature] for t_o_dict in time_ordered_feature_tensor_dicts]
+        pregrasp_op_batch = self.to_tensors(time_ordered_feature_tensor_dicts, clear_view_image_feature)
 
         # image from the current time step
-        if grasp_sequence_image_feature not in time_ordered_feature_tensor_dicts[0]:
-            features = [k for k, v in six.iteritems(time_ordered_feature_tensor_dicts[0])]
-            raise ValueError('get_training_tensors(): unknown grasp_sequence_image_feature selected: {}'.format(image_feature) +
-                             ' Available features include: ' + str(features))
-        # TODO(ahundt): follow the time step range limits again [grasp_sequence_min_time_step:grasp_sequence_max_time_step]
-        grasp_step_op_batch = [t_o_dict[grasp_sequence_image_feature] for t_o_dict in time_ordered_feature_tensor_dicts]
+        grasp_step_op_batch = self.to_tensors(time_ordered_feature_tensor_dicts, grasp_sequence_image_feature)
 
         # grasp success labels from the motion
-        if grasp_success_label not in time_ordered_feature_tensor_dicts[0]:
-            features = [k for k, v in six.iteritems(time_ordered_feature_tensor_dicts[0])]
-            raise ValueError('get_training_tensors(): unknown grasp_success_label feature selected: {}'.format(motion_command_feature) +
-                             ' Available features include: ' + str(features))
-        # TODO(ahundt): follow the time step range limits again [grasp_sequence_min_time_step:grasp_sequence_max_time_step]
-        grasp_success_op_batch = [t_o_dict[grasp_success_label] for t_o_dict in time_ordered_feature_tensor_dicts]
+        grasp_success_op_batch = self.to_tensors(time_ordered_feature_tensor_dicts, grasp_success_label)
 
         pregrasp_op_batch = tf.parallel_stack(pregrasp_op_batch)
         grasp_step_op_batch = tf.parallel_stack(grasp_step_op_batch)

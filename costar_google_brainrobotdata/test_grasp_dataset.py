@@ -10,7 +10,7 @@ from tqdm import tqdm  # progress bars https://github.com/tqdm/tqdm
 def test_grasp_dataset():
     dataset = '102'
     grasp_dataset_object = GraspDataset(dataset=dataset)
-    batch_size = 1
+    batch_size = 10
     num_batches_to_traverse = 1000
 
     with tf.Session() as tf_session:

@@ -13,7 +13,11 @@ def test_grasp_dataset():
     batch_size = 10
     num_batches_to_traverse = 1000
 
-    with tf.Session() as tf_session:
+    config = tf.ConfigProto()
+    config.inter_op_parallelism_threads = 40
+    config.intra_op_parallelism_threads = 40
+    config.gpu_options.allow_growth = True
+    with tf.Session(config=config) as tf_session:
         (feature_op_dicts,
          features_complete_list,
          time_ordered_feature_name_dict,

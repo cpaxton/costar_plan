@@ -146,10 +146,11 @@ flags.DEFINE_string('grasp_sequence_image_feature', 'move_to_grasp/time_ordered/
                             rgb image after all preprocessing as defined by the other parameters have been applied.
 
                     """)
-flags.DEFINE_string('grasp_success_label', 'grasp_success',
+flags.DEFINE_string('grasp_success_label', 'move_to_grasp/time_ordered/grasp_success',
                     """Algorithm used to generate the grasp_success labels.
-
-                        grasp_success: binary scalar, 1 for success 0 for failure
+                        'move_to_grasp/time_ordered/grasp_success'
+                            binary scalar, 1 for success 0 for failure
+                        'grasp_success': binary scalar, 1 for success 0 for failure
                         grasp_success_binary_2D: Apply a constant label at every input pixel.
                             (Not yet implemented.)
                         grasp_success_gaussian_2d: Apply a 0 to 1 label at every input pixel

@@ -25,10 +25,13 @@ except ImportError:
           'or follow the instructions at https://github.com/jrl-umi3218/Eigen3ToPython'
           'and https://github.com/jrl-umi3218/SpaceVecAlg and make sure python bindings'
           'are enabled.')
+    eigen = None
+    sva = None
 
 from skimage.draw import circle_perimeter_aa  # Image drawing algorithms http://scikit-image.org
 from skimage.draw import set_color  # Image drawing algorithms http://scikit-image.org
 from numba import jit
+
 
 def vector_quaternion_array_to_ptransform(vector_quaternion_array, q_inverse=True, t_inverse=False, pt_inverse=False):
     """Convert a vector and quaternion pose array to a plucker transform.

@@ -19,7 +19,6 @@ import grasp_dataset
 import grasp_model
 
 from tqdm import tqdm  # progress bars https://github.com/tqdm/tqdm
-from keras_tqdm import TQDMCallback  # Keras tqdm progress bars https://github.com/bstriner/keras-tqdm
 
 flags.DEFINE_string('learning_rate_decay_algorithm', 'power_decay',
                     """Determines the algorithm by which learning rate decays,
@@ -255,9 +254,8 @@ class GraspTrain(object):
         csv_logger = CSVLogger(weights_name + '.csv')
         checkpoint = keras.callbacks.ModelCheckpoint(weights_name + '-epoch-{epoch:03d}-loss-{loss:.3f}-acc-{acc:.3f}.h5',
                                                      save_best_only=True, verbose=1, monitor='acc')
-        progress_bar = TQDMCallback()
 
-        callbacks = callbacks + [early_stopper, csv_logger, checkpoint, progress_bar]
+        callbacks = callbacks + [early_stopper, csv_logger, checkpoint]
 
         if FLAGS.progress_tracker is 'tensorboard':
             progress_tracker = TensorBoard(log_dir='./' + weights_name, write_graph=True,

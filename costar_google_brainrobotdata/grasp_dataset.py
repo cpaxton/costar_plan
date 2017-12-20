@@ -884,13 +884,18 @@ class GraspDataset(object):
 
         # Get different image features depending on if
         # cropping is enabled or not.
+        # Note that depth images can be converted to xyz images
+        # when the camera/intrinsics/matrix33 is available.
         xyz_image_feature_type = 'xyz_image/decoded'
+        depth_image_feature_type = 'depth_image/decoded'
         camera_intrinsics_name = 'camera/intrinsics/matrix33'
         if random_crop:
             xyz_image_feature_type = 'xyz_image/cropped'
+            depth_image_feature_type = 'depth_image/cropped'
             camera_intrinsics_name = 'camera/cropped/intrinsics/matrix33'
 
         xyz_image_clear_view_name = 'pregrasp/' + xyz_image_feature_type
+        depth_image_clear_view_name = 'pregrasp/' + depth_image_feature_type
 
         def add_feature_op(fixed_feature_op_dict, features_complete_list, time_ordered_feature_name_dict, new_op, shape, name, batch_i, time_step_j):
             """Helper function to extend the dict containing feature ops
@@ -921,7 +926,18 @@ class GraspDataset(object):
 
         # loop through all grasp attempts in this batch
         for batch_i, (fixed_feature_op_dict, sequence_feature_op_dict) in enumerate(tqdm(feature_op_dicts, desc='get_transform_tensors')):
-            xyz_clear_view_op = fixed_feature_op_dict[xyz_image_clear_view_name]
+
+            # Note that the XYZ image computation can be enabled/disabled,
+            # so if no XYZ image is available supply the depth image.
+            # Performance may actually be better with the xyz image
+            # computed on the fly in
+            # grasp_geometry.grasp_dataset_to_transforms_and_features()
+            # due to the python global interpreter lock.
+            # see image_decode() for more details.
+            if xyz_image_clear_view_name in fixed_feature_op_dict:
+                cartesian_clear_view_op = fixed_feature_op_dict[xyz_image_clear_view_name]
+            else:
+                cartesian_clear_view_op = fixed_feature_op_dict[depth_image_clear_view_name]
             final_base_to_endeffector_transform_op = fixed_feature_op_dict[final_base_to_endeffector_transform_name]
             camera_intrinsics_matrix = fixed_feature_op_dict[camera_intrinsics_name]
             camera_T_base = fixed_feature_op_dict['camera/transforms/camera_T_base/matrix44']
@@ -946,7 +962,7 @@ class GraspDataset(object):
                  delta_depth_quat_5] = tf.py_func(
                     grasp_geometry.grasp_dataset_to_transforms_and_features,
                     # parameters for grasp_dataset_to_transforms_and_features() function call
-                    [xyz_clear_view_op, camera_intrinsics_matrix, camera_T_base,
+                    [cartesian_clear_view_op, camera_intrinsics_matrix, camera_T_base,
                      base_to_endeffector_op, final_base_to_endeffector_transform_op],
                      # return type data formats to expect
                     [tf.float32] * 14,
@@ -1142,7 +1158,7 @@ class GraspDataset(object):
         return dict_and_feature_tuple_list, features_complete_list, feature_count, attempt_count
 
     @staticmethod
-    def _image_decode(feature_op_dict, sensor_image_dimensions=None, image_features=None, point_cloud_fn='numpy', decode_depth_as='depth'):
+    def _image_decode(feature_op_dict, sensor_image_dimensions=None, image_features=None, decode_depth_as='depth', point_cloud_fn='numpy'):
         """ Add features to dict that supply decoded png and jpeg images for any encoded images present.
 
         Any feature path that is 'image/encoded' will also now have 'image/decoded', and 'image/xyz' when
@@ -1155,9 +1171,20 @@ class GraspDataset(object):
                 [1, FLAGS.sensor_image_height, FLAGS.sensor_image_width, FLAGS.sensor_color_channels]
             image_features: list of image feature strings to modify, generated automatically if not supplied,
                 improves performance.
-            point_cloud_fn: Choose the function to convert depth images to point clouds. 'numpy' calls
-                grasp_geometry.depth_image_to_point_cloud(). 'tensorflow' calls
-                grasp_geometry_tf.depth_image_to_point_cloud().
+            point_cloud_fn: Choose the function to convert depth images to point clouds.
+
+                    Performance may actually be better with the xyz image computed on the fly in
+                    grasp_geometry.grasp_dataset_to_transforms_and_features()
+                    due massive slowdowns encountered due to the python global interpreter lock.
+                    Note that the XYZ image computation can be enabled/disabled,
+                    so if no XYZ image is available supply the depth image.
+
+                None: Do not generate XYZ point clouds from the depth image during a call to image_decode,
+                    and the feature is not created. (the default)
+                'numpy': calls grasp_geometry.depth_image_to_point_cloud().
+                'tensorflow' calls grasp_geometry_tf.depth_image_to_point_cloud().
+                    The tensorflow option has bugs at the time of writing, but may be the ideal choice
+                    once the bugs are resolved.
             decode_depth_as:
                The default 'depth' turns png encoded depth images into 1 channel depth images, the format for training.
                'rgb' keeps the png encoded format so it can be visualized, particularly in create_gif().
@@ -1207,14 +1234,14 @@ class GraspDataset(object):
                         image = image / RGB_SCALE_FACTOR
                         image.set_shape([height, width])
                         # depth images have one channel
-                        if 'camera/intrinsics/matrix33' in feature_op_dict:
+                        if 'camera/intrinsics/matrix33' in feature_op_dict and point_cloud_fn is not None:
                             with tf.name_scope('xyz'):
                                 # generate xyz point cloud image feature
                                 if point_cloud_fn == 'tensorflow':
                                     # should be more efficient than the numpy version
                                     xyz_image = grasp_geometry_tf.depth_image_to_point_cloud(
                                         image, feature_op_dict['camera/intrinsics/matrix33'])
-                                else:
+                                elif point_cloud_fn == 'numpy':
                                     [xyz_image] = tf.py_func(
                                         grasp_geometry.depth_image_to_point_cloud,
                                         # parameters for function call
@@ -1222,6 +1249,8 @@ class GraspDataset(object):
                                         [tf.float32],
                                         stateful=False, name='py_func/depth_image_to_point_cloud'
                                     )
+                                else:
+                                    raise ValueError('point_cloud_fn must be one of tensorflow, numpy, or None')
                                 xyz_image.set_shape([height, width, 3])
                                 xyz_image = tf.reshape(xyz_image, [height, width, 3])
                                 xyz_feature = image_feature.replace('depth_image/encoded', 'xyz_image/decoded')

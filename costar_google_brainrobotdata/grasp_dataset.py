@@ -1442,7 +1442,8 @@ class GraspDataset(object):
             random_crop_dimensions=None,
             random_crop_offset=None,
             resize=FLAGS.resize,
-            seed=None):
+            seed=None,
+            verbose=0):
         """Get feature dictionaries containing ops and time ordered feature lists.
 
         This function is for advanced use cases and aims to make it easy to perform custom training,
@@ -1483,9 +1484,10 @@ class GraspDataset(object):
             features_complete_list = np.append(features_complete_list, new_feature_list)
             feature_op_dicts = dict_and_feature_tuple_list
 
-        # print('feature_op_dicts_after_crop len:', len(feature_op_dicts), 'dicts:', feature_op_dicts)
-        print('feature_complete_list after crop len:', len(features_complete_list), 'list:', features_complete_list)
-        print('END DICTS AFTER CROP')
+        if verbose:
+            # print('feature_op_dicts_after_crop len:', len(feature_op_dicts), 'dicts:', feature_op_dicts)
+            print('feature_complete_list after crop len:', len(features_complete_list), 'list:', features_complete_list)
+            print('END DICTS AFTER CROP')
 
         # Get the surface relative transform tensors
         #
@@ -1497,9 +1499,10 @@ class GraspDataset(object):
             time_ordered_feature_name_dict=time_ordered_feature_name_dict,
             num_samples=num_samples, batch_size=batch_size, random_crop=random_crop)
 
-        # print('feature_op_dicts_after_transform_tensors, len', len(feature_op_dicts), 'dicts:', feature_op_dicts)
-        print('feature_complete_list after transforms len:', len(features_complete_list), 'list:', features_complete_list)
-        print('END DICTS AFTER TRANSFORMS')
+        if verbose:
+            # print('feature_op_dicts_after_transform_tensors, len', len(feature_op_dicts), 'dicts:', feature_op_dicts)
+            print('feature_complete_list after transforms len:', len(features_complete_list), 'list:', features_complete_list)
+            print('END DICTS AFTER TRANSFORMS')
 
         # get the clear view rgb, depth, and xyz image names
         rgb_clear_view_name = 'grasp/image/decoded'

@@ -1722,16 +1722,24 @@ class GraspDataset(object):
         # grasp success labels from the motion
         grasp_success_op_batch = self.to_tensors(time_ordered_feature_tensor_dicts, grasp_success_label)
 
+        # make one long list from each list of lists
+        simplified_grasp_command_op_batch = list(itertools.chain.from_iterable(simplified_grasp_command_op_batch))
+        pregrasp_op_batch = list(itertools.chain.from_iterable(pregrasp_op_batch))
+        grasp_success_op_batch = list(itertools.chain.from_iterable(grasp_success_op_batch))
+        grasp_step_op_batch = list(itertools.chain.from_iterable(grasp_step_op_batch))
+
+        # stack all the data in a way that will let it run in parallel
         pregrasp_op_batch = tf.parallel_stack(pregrasp_op_batch)
         grasp_step_op_batch = tf.parallel_stack(grasp_step_op_batch)
         simplified_grasp_command_op_batch = tf.parallel_stack(simplified_grasp_command_op_batch)
         grasp_success_op_batch = tf.parallel_stack(grasp_success_op_batch)
 
+        # combine all the data into large batch tensors
         pregrasp_op_batch = tf.concat(pregrasp_op_batch, 0)
         grasp_step_op_batch = tf.concat(grasp_step_op_batch, 0)
         simplified_grasp_command_op_batch = tf.concat(simplified_grasp_command_op_batch, 0)
         grasp_success_op_batch = tf.concat(grasp_success_op_batch, 0)
-        # add one extra dimension so they match
+        # add one extra dimension to grasp_success so it matches the other tensors
         grasp_success_op_batch = tf.expand_dims(grasp_success_op_batch, -1)
         return pregrasp_op_batch, grasp_step_op_batch, simplified_grasp_command_op_batch, grasp_success_op_batch, num_samples
 

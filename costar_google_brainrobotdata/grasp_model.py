@@ -122,9 +122,10 @@ def grasp_model_resnet(clear_view_image_op,
                        dropout_rate=0.0,
                        initial_filters=96,
                        initial_kernel_size=(3, 3),
+                       activation='sigmoid',
                        repetitions=None):
     if repetitions is None:
-        repetitions = [1, 1, 1, 1]
+        repetitions = [3, 4, 6, 3]
     combined_input_data = concat_images_with_tiled_vector([clear_view_image_op, current_time_image_op], input_vector_op)
     combined_input_shape = K.int_shape(combined_input_data)
     # the input shape should be a tuple of 3 values
@@ -141,7 +142,8 @@ def grasp_model_resnet(clear_view_image_op,
                    activation='sigmoid',
                    initial_filters=initial_filters,
                    initial_kernel_size=initial_kernel_size,
-                   pooling=None,
+                   initial_pooling=None,
+                   final_pooling=None,
                    dropout=dropout_rate)
     return model
 

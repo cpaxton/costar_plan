@@ -1365,7 +1365,7 @@ class GraspDataset(object):
             return tf.cast(rgb_image_op, tf.float32)
 
     @staticmethod
-    def _to_tensors(feature_op_dicts, features):
+    def to_tensors(feature_op_dicts, features):
         """Convert a list or dict of feature strings to tensors.
 
         # Arguments
@@ -1699,7 +1699,7 @@ class GraspDataset(object):
             batch_size=batch_size, random_crop=random_crop, sensor_image_dimensions=sensor_image_dimensions,
             random_crop_dimensions=random_crop_dimensions, random_crop_offset=random_crop_offset)
 
-        time_ordered_feature_tensor_dicts = GraspDataset._to_tensors(feature_op_dicts, time_ordered_feature_name_dict)
+        time_ordered_feature_tensor_dicts = GraspDataset.to_tensors(feature_op_dicts, time_ordered_feature_name_dict)
 
         # motion commands, such as pose or transform features
         simplified_grasp_command_op_batch = self.to_tensors(time_ordered_feature_tensor_dicts, motion_command_feature)
@@ -1779,7 +1779,7 @@ class GraspDataset(object):
             # batch shize should actually always be 1 for this visualization
             output_features_dicts = tf_session.run(feature_op_dicts)
             # reorganize is grasp attempt so it is easy to walk through
-            [time_ordered_feature_data_dict] = self._to_tensors(output_features_dicts, time_ordered_feature_name_dict)
+            [time_ordered_feature_data_dict] = self.to_tensors(output_features_dicts, time_ordered_feature_name_dict)
             # features_dict_np contains fixed dimension features, sequence_dict_np contains variable length sequences of data
             # We're assuming the batch size is 1, which is why there are only two elements in the list.
             [(features_dict_np, sequence_dict_np)] = output_features_dicts
@@ -1790,7 +1790,7 @@ class GraspDataset(object):
                     feature_type=rgb_feature_type)
                 if attempt_num == 0:
                     print("Saving rgb features to a gif in the following order: " + str(ordered_rgb_image_features))
-                video = np.concatenate(self._to_tensors(output_features_dicts, ordered_rgb_image_features), axis=0)
+                video = np.concatenate(self.to_tensors(output_features_dicts, ordered_rgb_image_features), axis=0)
                 if draw == 'circle_on_gripper':
                     coordinates = time_ordered_feature_data_dict[
                         'move_to_grasp/time_ordered/reached_pose/transforms/'
@@ -1821,7 +1821,7 @@ class GraspDataset(object):
                     feature_type=depth_feature_type)
                 if attempt_num == 0:
                     print("Saving depth features to a gif in the following order: " + str(ordered_depth_image_features))
-                video = np.concatenate(self._to_tensors(output_features_dicts, ordered_depth_image_features), axis=0)
+                video = np.concatenate(self.to_tensors(output_features_dicts, ordered_depth_image_features), axis=0)
                 gif_filename = (os.path.basename(str(self.dataset) + '_grasp_' + str(int(attempt_num)) +
                                 '_depth_success_' + str(int(features_dict_np['grasp_success'])) + '.gif'))
                 gif_path = os.path.join(visualization_dir, gif_filename)

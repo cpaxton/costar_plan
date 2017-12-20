@@ -1384,10 +1384,11 @@ class GraspDataset(object):
         """
         if isinstance(features, str):
             # motion commands, such as pose or transform features
-            if motion_command_feature not in feature_op_dicts[0]:
-                features = [k for k, v in six.iteritems(feature_op_dicts[0])]
-                raise ValueError('unknown feature selected: {}'.format(motion_command_feature) +
-                                 ' Available features include: ' + str(features))
+            if features not in feature_op_dicts[0]:
+                available_features = [k for k, v in six.iteritems(feature_op_dicts[0])]
+                raise ValueError(
+                    'Unknown feature selected: {}'.format(features) +
+                    ' Available features include: ' + str(available_features))
             # TODO(ahundt): follow the time step range limits again [grasp_sequence_min_time_step:grasp_sequence_max_time_step]
             simplified_op_list = [t_o_dict[motion_command_feature] for t_o_dict in feature_op_dicts]
             return simplified_op_list
@@ -1403,7 +1404,9 @@ class GraspDataset(object):
                     list_of_tensor_dicts.append(tensor_dict)
                 return list_of_tensor_dicts
             else:
-                raise ValueError('feature_op_dicts expects data in the following format: [({\'feature_name\': tensor},{\'feature_name\': sequence_tensor})')
+                raise ValueError(
+                    'feature_op_dicts expects data in the following format: '
+                    '[({\'feature_name\': tensor},{\'feature_name\': sequence_tensor})')
         else:
             # assume features is a list, go through and get the list of lists that contain tensors
             return [[fixed_dict[feature] for feature in features] for (fixed_dict, seq_dict) in feature_op_dicts]

@@ -2,7 +2,8 @@
 import numpy as np
 import pytest
 import tensorflow as tf
-from grasp_geometry import grasp_dataset_to_transforms_and_features
+from grasp_dataset import GraspDataset
+from grasp_dataset import get_multi_dataset_training_tensors
 from tqdm import tqdm  # progress bars https://github.com/tqdm/tqdm
 
 

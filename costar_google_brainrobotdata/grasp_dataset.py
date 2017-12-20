@@ -1957,7 +1957,6 @@ def get_multi_dataset_training_tensors(
     if (grasp_datasets_batch_algorithm != 'constant' and grasp_datasets_batch_algorithm != 'proportional'):
         raise ValueError('grasp_datasets_batch_algorithm string value must be either constant or proportional.')
 
-
     if isinstance(datasets, str):
         datasets = dataset.split(',')
     elif not isinstance(datasets, list):

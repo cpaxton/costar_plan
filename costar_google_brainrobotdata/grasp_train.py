@@ -18,6 +18,7 @@ from tensorflow.python.platform import flags
 import grasp_dataset
 import grasp_model
 
+from tqdm import tqdm  # progress bars https://github.com/tqdm/tqdm
 from keras_tqdm import TQDMCallback  # Keras tqdm progress bars https://github.com/bstriner/keras-tqdm
 
 flags.DEFINE_string('learning_rate_decay_algorithm', 'power_decay',
@@ -169,7 +170,7 @@ class GraspTrain(object):
 
         max_batch_size = max(dataset_batch_sizes)
         # Not sure why any thing assigned to max_batch_size, it can pass
-        for single_dataset, single_batch in zip(grasp_dataset_list, dataset_batch_sizes):
+        for single_dataset, single_batch in zip(grasp_dataset_list, tqdm(dataset_batch_sizes, desc='load_selected_datasets'):
             proportional_batch_size = batch_size
             if(grasp_datasets_batch_algorithm == 'proportional'):
                 proportional_batch_size = int(batch_size * single_batch / max_batch_size)

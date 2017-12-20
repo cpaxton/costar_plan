@@ -91,6 +91,7 @@ flags.DEFINE_integer('grasp_sequence_min_time_step', None,
                         that will be used in training and evaluation. This may be needed
                         to reduce memory utilization or check performance at different
                         stages of a grasping motion.""")
+<<<<<<< ca37a08c04d2ceee288e8b58fea0283525737bfd
 flags.DEFINE_string('grasp_sequence_motion_command_feature', 'move_to_grasp/time_ordered/endeffector_current_T_endeffector_final_vec_sin_cos_5',
                     """Different ways of representing the motion vector parameter.
                        'final_pose_orientation_quaternion' directly input the final pose translation and orientation.
@@ -106,6 +107,27 @@ flags.DEFINE_string('grasp_sequence_motion_command_feature', 'move_to_grasp/time
                            the transform from the current time step to the final time step
                            to generate the parameters [x, y, z, qx, qy, qz, qw].
                     """)
+=======
+flags.DEFINE_string(
+    'grasp_sequence_motion_command_feature',
+    'move_to_grasp/time_ordered/reached_pose/transforms/endeffector_current_T_endeffector_final/vec_quat_7',
+    """Different ways of representing the motion vector parameter.
+       'move_to_grasp/time_ordered/reached_pose/transforms/endeffector_current_T_endeffector_final/vec_quat_7'
+           transform from the current endeffector pose to the final endeffector pose.
+       'final_pose_orientation_quaternion' directly input the final pose translation and orientation.
+       'next_timestep' input the params for the command saved in the dataset with translation,
+           sin theta, cos theta from the current time step to the next.
+       'endeffector_current_T_endeffector_final_vec_sin_cos_5' use
+           the real reached gripper pose of the end effector to calculate
+           the transform from the current time step to the final time step
+           to generate the parameters defined in https://arxiv.org/abs/1603.02199,
+           consisting of [x,y,z, sin(theta), cos(theta)].
+       'endeffector_current_T_endeffector_final_vec_quat_7' use
+           the real reached gripper pose of the end effector to calculate
+           the transform from the current time step to the final time step
+           to generate the parameters [x, y, z, qx, qy, qz, qw].
+    """)
+>>>>>>> update motion command feature to one that exists with the new API design
 flags.DEFINE_string('clear_view_image_feature', 'move_to_grasp/time_ordered/clear_view/rgb_image/preprocessed',
                     """RGB image input feature for the clear scene view, typically an image from before the robot enters the scene.
 
@@ -124,7 +146,7 @@ flags.DEFINE_string('grasp_sequence_image_feature', 'move_to_grasp/time_ordered/
                             rgb image after all preprocessing as defined by the other parameters have been applied.
 
                     """)
-flags.DEFINE_string('grasp_success_label', 'binary_gaussian_2D',
+flags.DEFINE_string('grasp_success_label', 'grasp_success',
                     """Algorithm used to generate the grasp_success labels.
 
                         grasp_success: binary scalar, 1 for success 0 for failure

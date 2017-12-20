@@ -1180,7 +1180,6 @@ class GraspDataset(object):
                         image = image / RGB_SCALE_FACTOR
                         image.set_shape([height, width])
                         # depth images have one channel
-                        print('depth image:', image)
                         if 'camera/intrinsics/matrix33' in feature_op_dict:
                             with tf.name_scope('xyz'):
                                 # generate xyz point cloud image feature
@@ -1201,7 +1200,6 @@ class GraspDataset(object):
                                 xyz_feature = image_feature.replace('depth_image/encoded', 'xyz_image/decoded')
                                 feature_op_dict[xyz_feature] = xyz_image
                                 new_feature_list = np.append(new_feature_list, xyz_feature)
-                                print('xyz_image:', xyz_image)
                         image = tf.reshape(image, [height, width, 1])
                 else:
                     with tf.name_scope('rgb'):

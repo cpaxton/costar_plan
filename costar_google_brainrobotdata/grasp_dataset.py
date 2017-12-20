@@ -1390,7 +1390,7 @@ class GraspDataset(object):
                     'Unknown feature selected: {}'.format(features) +
                     ' Available features include: ' + str(available_features))
             # TODO(ahundt): follow the time step range limits again [grasp_sequence_min_time_step:grasp_sequence_max_time_step]
-            simplified_op_list = [t_o_dict[motion_command_feature] for t_o_dict in feature_op_dicts]
+            simplified_op_list = [t_o_dict[features] for t_o_dict in feature_op_dicts]
             return simplified_op_list
         elif isinstance(features, dict):
             list_of_tensor_dicts = []

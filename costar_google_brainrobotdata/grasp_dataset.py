@@ -708,7 +708,8 @@ class GraspDataset(object):
             time_ordered_feature_name_dict=None,
             num_samples=None,
             batch_size=FLAGS.batch_size,
-            random_crop=FLAGS.random_crop):
+            random_crop=FLAGS.random_crop,
+            verbose=0):
         """Get runtime generated 3D transform feature tensors as a dictionary, including depth surface relative transforms.
 
         @TODO(ahundt) update this documentation.
@@ -849,7 +850,8 @@ class GraspDataset(object):
             feature_type='reached_pose/transforms/base_T_endeffector/vec_quat_7',
             step='move_to_grasp')
 
-        print('all_base_to_endeffector_transforms: ', all_base_to_endeffector_transforms)
+        if verbose:
+            print('all_base_to_endeffector_transforms: ', all_base_to_endeffector_transforms)
         first_timed_index = all_base_to_endeffector_transforms.index(timed_base_to_endeffector_transforms[0])
         base_to_endeffector_transforms = ['approach/transforms/base_T_endeffector/vec_quat_7'] + timed_base_to_endeffector_transforms[:-1]
 

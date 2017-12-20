@@ -1462,7 +1462,8 @@ class GraspDataset(object):
 
         # image type to load
         preprocessed_suffix = 'decoded'
-        print('feature_complete_list before crop len:', len(features_complete_list), 'list:', features_complete_list)
+        if verbose:
+            print('feature_complete_list before crop len:', len(features_complete_list), 'list:', features_complete_list)
 
         # do cropping if enabled
         if random_crop:

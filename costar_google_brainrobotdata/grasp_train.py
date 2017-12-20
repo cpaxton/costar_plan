@@ -38,7 +38,7 @@ flags.DEFINE_string('grasp_datasets_train', '062_b,063,072_a,082_b,102',
                     totaling 513,491 grasp attempts.
                     See https://sites.google.com/site/brainrobotdata/home
                     for a full listing.""")
-flags.DEFINE_string('grasp_datasets_batch_algorithm', 'constant',
+flags.DEFINE_string('grasp_datasets_batch_algorithm', 'proportional',
                     """Use default batch if constant,
                     'constant' training on multiple datasets reads `batch_size`
                         elements from each dataset at each training step when this parameter.

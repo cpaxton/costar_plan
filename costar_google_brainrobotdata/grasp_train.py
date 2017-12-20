@@ -178,7 +178,6 @@ class GraspTrain(object):
             (pregrasp_op, grasp_step_op,
              simplified_grasp_command_op,
              grasp_success_op,
-             example_batch_size,
              num_samples) = data.get_training_tensors(batch_size=proportional_batch_size,
                                                       imagenet_mean_subtraction=imagenet_mean_subtraction,
                                                       random_crop=random_crop,
@@ -360,7 +359,6 @@ class GraspTrain(object):
         # list of dictionaries the length of batch_size
         (pregrasp_op_batch, grasp_step_op_batch,
          simplified_grasp_command_op_batch,
-         example_batch_size,
          grasp_success_op_batch,
          num_samples) = data.get_training_tensors(batch_size=batch_size,
                                                   imagenet_mean_subtraction=imagenet_mean_subtraction,

@@ -1740,8 +1740,7 @@ class GraspDataset(object):
         grasp_step_op_batch = tf.concat(grasp_step_op_batch, 0)
         simplified_grasp_command_op_batch = tf.concat(simplified_grasp_command_op_batch, 0)
         grasp_success_op_batch = tf.concat(grasp_success_op_batch, 0)
-        # add one extra dimension to grasp_success so it matches the other tensors
-        grasp_success_op_batch = tf.expand_dims(grasp_success_op_batch, -1)
+
         return pregrasp_op_batch, grasp_step_op_batch, simplified_grasp_command_op_batch, grasp_success_op_batch, num_samples
 
     def npy_to_gif(self, npy, filename, fps=2):

@@ -36,9 +36,18 @@ from tensorflow.python.ops import data_flow_ops
 from keras.utils import get_file
 from ply import write_xyz_rgb_as_ply
 from PIL import Image
-from tqdm import tqdm  # progress bars https://github.com/tqdm/tqdm
 
-import moviepy.editor as mpy
+# progress bars https://github.com/tqdm/tqdm
+# import tqdm without enforcing it as a dependency
+try:
+    from tqdm import tqdm
+except ImportError:
+
+    def tqdm(*args, **kwargs):
+        if args:
+            return args[0]
+        return kwargs.get('iterable', None)
+
 from grasp_dataset import GraspDataset
 import grasp_geometry
 import grasp_geometry_tf

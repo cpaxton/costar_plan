@@ -9,12 +9,21 @@ from grasp_dataset import get_multi_dataset_training_tensors
 from tqdm import tqdm  # progress bars https://github.com/tqdm/tqdm
 
 
-def test_grasp_dataset():
+def profile_grasp_dataset():
+    # To profile, run this program then open
+    # the address chrome://tracing/ in google chrome,
+    # other browsers will not work.
+    # Use the load button on that website to open the file
+    #
+    #     /tmp/profiling/timeline-0.json
+    #
+    # The tracing results should load immediately!
     dataset = '102'
     batch_size = 10
-    num_batches_to_traverse = 10
+    num_batches_to_traverse = 1000
 
     grasp_dataset_object = GraspDataset(dataset=dataset)
+
     (feature_op_dicts,
      features_complete_list,
      time_ordered_feature_name_dict,
@@ -24,15 +33,14 @@ def test_grasp_dataset():
     config.inter_op_parallelism_threads = 40
     config.intra_op_parallelism_threads = 40
     config.gpu_options.allow_growth = True
-    with tf.Session(config=config) as tf_session:
-        tf_session.run(tf.global_variables_initializer())
-        for batch_num in tqdm(range(num_batches_to_traverse), desc='dataset'):
-            attempt_num_string = 'batch_' + str(batch_num).zfill(4) + '_'
-            print('dataset_' + dataset + '_' + attempt_num_string + 'starting')
-            output_features_dicts = tf_session.run(feature_op_dicts)
-            assert(len(output_features_dicts) > 0)
+    global_step = tf.train.get_or_create_global_step()
+    hooks = [ProfilerHook(save_secs=30, output_dir="/tmp/profiling")]
+    with tf.train.SingularMonitoredSession(hooks=hooks, config=config) as tf_session:
+        for _ in tqdm(range(num_batches_to_traverse)):
+            tf_session.run(feature_op_dicts)
+            if tf_session.should_stop():
+                break
 
 
 if __name__ == '__main__':
-    test_grasp_dataset()
-    pytest.main([__file__])
+    profile_grasp_dataset()

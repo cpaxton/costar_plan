@@ -16,7 +16,17 @@ import six
 import numpy as np
 import tensorflow as tf
 import re
-from tqdm import tqdm  # progress bars https://github.com/tqdm/tqdm
+
+# progress bars https://github.com/tqdm/tqdm
+# import tqdm without enforcing it as a dependency
+try:
+    from tqdm import tqdm
+except ImportError:
+
+    def tqdm(*args, **kwargs):
+        if args:
+            return args[0]
+        return kwargs.get('iterable', None)
 
 from tensorflow.python.platform import flags
 from tensorflow.python.platform import gfile
@@ -1074,7 +1084,7 @@ class GraspDataset(object):
 
         return new_feature_op_dicts, features_complete_list, time_ordered_feature_name_dict, num_samples
 
-    def _get_simple_parallel_dataset_ops(self, dataset=None, batch_size=1, buffer_size=100, parallelism=10, shift_ratio=0.01):
+    def _get_simple_parallel_dataset_ops(self, dataset=None, batch_size=1, buffer_size=300, parallelism=20, shift_ratio=0.01):
         """ Simple unordered & parallel TensorFlow ops that go through the whole dataset.
 
         # Returns
@@ -1158,7 +1168,7 @@ class GraspDataset(object):
         return dict_and_feature_tuple_list, features_complete_list, feature_count, attempt_count
 
     @staticmethod
-    def _image_decode(feature_op_dict, sensor_image_dimensions=None, image_features=None, decode_depth_as='depth', point_cloud_fn='numpy'):
+    def _image_decode(feature_op_dict, sensor_image_dimensions=None, image_features=None, decode_depth_as='depth', point_cloud_fn='tensorflow'):
         """ Add features to dict that supply decoded png and jpeg images for any encoded images present.
 
         Any feature path that is 'image/encoded' will also now have 'image/decoded', and 'image/xyz' when
@@ -1271,7 +1281,8 @@ class GraspDataset(object):
     @staticmethod
     def _image_random_crop(feature_op_dict, sensor_image_dimensions=None,
                            random_crop_dimensions=None,
-                           random_crop_offset=None, seed=None, image_features=None):
+                           random_crop_offset=None, seed=None, image_features=None,
+                           verbose=0):
         """ Crop all images and update parameters in accordance with a single random_crop.
 
         All images will be cropped in an identical fashion for the entire feature_op_dict,
@@ -1336,7 +1347,8 @@ class GraspDataset(object):
 
             for image_feature in image_features:
                 image = feature_op_dict[image_feature]
-                print('_image_random_crop image:', image, 'random_crop_offset:', random_crop_offset)
+                if verbose:
+                    print('_image_random_crop image:', image, 'random_crop_offset:', random_crop_offset)
                 if 'depth_image' in image_feature and 'xyz' not in image_feature:
                     image = rcp.crop_images(image_list=image, offset=random_crop_offset, size=depth_crop_dim_tensor)
                 else:

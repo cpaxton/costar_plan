@@ -28,9 +28,12 @@ except ImportError:
     eigen = None
     sva = None
 
-from skimage.draw import circle_perimeter_aa  # Image drawing algorithms http://scikit-image.org
-from skimage.draw import set_color  # Image drawing algorithms http://scikit-image.org
-from numba import jit
+try:
+    from skimage.draw import circle_perimeter_aa  # Image drawing algorithms http://scikit-image.org
+    from skimage.draw import set_color  # Image drawing algorithms http://scikit-image.org
+except ImportError:
+    circle_perimeter_aa = None
+    set_color = None
 
 
 def vector_quaternion_array_to_ptransform(vector_quaternion_array, q_inverse=True, t_inverse=False, pt_inverse=False):
@@ -166,61 +169,7 @@ def vector_to_ptransform(XYZ):
     return ptransform
 
 
-@jit(nopython=True)
-def depth_image_to_point_cloud_numba(depth, depth_shape, intrinsics_matrix, XYZ):
-    fx = intrinsics_matrix[0, 0]
-    fy = intrinsics_matrix[1, 1]
-    # center of image x coordinate
-    center_x = intrinsics_matrix[2, 0]
-    # center of image y coordinate
-    center_y = intrinsics_matrix[2, 1]
-    y_range, x_range = depth_shape
-
-    for y in range(y_range):
-        for x in range(x_range):
-            Z = depth[y, x]
-            X = (x - center_x) * Z / fx
-            Y = (y - center_y) * Z / fy
-            XYZ[y, x] = [X, Y, Z]
-
-    return XYZ
-
-
 def depth_image_to_point_cloud(depth, intrinsics_matrix, dtype=np.float32):
-    """Depth images become an XYZ point cloud in the camera frame with shape (depth.shape[0], depth.shape[1], 3).
-
-    Transform a depth image into a point cloud in the camera frame with one point for each
-    pixel in the image, using the camera transform for a camera
-    centred at cx, cy with field of view fx, fy.
-
-    Based on:
-    https://github.com/tensorflow/models/blob/master/research/cognitive_mapping_and_planning/src/depth_utils.py
-    https://codereview.stackexchange.com/a/84990/10101
-
-    also see grasp_geometry_tf.depth_image_to_point_cloud().
-
-    # Arguments
-
-      depth: is a 2-D ndarray with shape (rows, cols) containing
-          32bit floating point depths in meters. The result is a 3-D array with
-          shape (rows, cols, 3). Pixels with invalid depth in the input have
-          NaN or 0 for the z-coordinate in the result.
-
-      intrinsics_matrix: 3x3 matrix for projecting depth values to z values
-      in the point cloud frame. http://ksimek.github.io/2013/08/13/intrinsic/
-      In this case x0, y0 are at index [2, 0] and [2, 1], respectively.
-
-      transform: 4x4 Rt matrix for rotating and translating the point cloud
-    """
-
-    depth = np.squeeze(depth)
-    XYZ = np.zeros(depth.shape + (3,))
-    XYZ = depth_image_to_point_cloud_numba(depth, depth.shape, intrinsics_matrix, XYZ)
-
-    return XYZ.astype(dtype)
-
-
-def depth_image_to_point_cloud_np(depth, intrinsics_matrix, flip_x=1.0, flip_y=1.0, dtype=np.float32):
     """Depth images become an XYZ point cloud in the camera frame with shape (depth.shape[0], depth.shape[1], 3).
 
     Transform a depth image into a point cloud in the camera frame with one point for each
@@ -248,24 +197,36 @@ def depth_image_to_point_cloud_np(depth, intrinsics_matrix, flip_x=1.0, flip_y=1
 
       transform: 4x4 Rt matrix for rotating and translating the point cloud
     """
-    fx = intrinsics_matrix[0, 0]
     fy = intrinsics_matrix[1, 1]
-    # center of image x coordinate
-    center_x = intrinsics_matrix[2, 0]
+    fx = intrinsics_matrix[0, 0]
     # center of image y coordinate
     center_y = intrinsics_matrix[2, 1]
-    # TODO(ahundt) make sure rot90 + fliplr is applied upstream in the dataset and to the depth images, ensure consistency with image intrinsics
-    depth = np.fliplr(np.rot90(np.squeeze(depth), 3))
-    # print(intrinsics_matrix)
-    x, y = np.meshgrid(np.arange(depth.shape[0]),
-                       np.arange(depth.shape[1]),
+    # center of image x coordinate
+    center_x = intrinsics_matrix[2, 0]
+    depth = np.squeeze(depth)
+    y_range, x_range = depth.shape
+
+    y, x = np.meshgrid(np.arange(y_range),
+                       np.arange(x_range),
                        indexing='ij')
-    for i in range(depth.ndim-2):
-        x = np.expand_dims(x, axis=0)
-        y = np.expand_dims(y, axis=0)
-    X = flip_x * (x - center_x) * depth / fx
-    Y = flip_y * (y - center_y) * depth / fy
-    XYZ = np.column_stack((X.flatten(), Y.flatten(), depth.flatten())).reshape(depth.shape + (3,))
+    assert y.size == x.size and y.size == depth.size
+    x = x.flatten()
+    y = y.flatten()
+    depth = depth.flatten()
+
+    X = (x - center_x) * depth / fx
+    Y = (y - center_y) * depth / fy
+
+    assert X.size == Y.size and X.size == depth.size
+    assert X.shape == Y.shape and X.shape == depth.shape
+
+    print('X np: ', X.shape)
+    print('Y np: ', Y.shape)
+    print('depth np: ', depth.shape)
+    XYZ = np.column_stack([X, Y, depth])
+    assert XYZ.shape == (y_range * x_range, 3)
+    print('XYZ pre reshape np: ', XYZ.shape)
+    XYZ = XYZ.reshape((y_range, x_range, 3))
 
     return XYZ.astype(dtype)
 
@@ -835,37 +796,42 @@ def gaussian_kernel_2D(size=(3, 3), center=(1, 1), sigma=1):
 
 def draw_circle(image, coordinate, color=None, radius=10):
     """ Draw a circle at the [y_height, x_width] coordinate of an image.
-    """
-    image_shape_len = len(image.shape)
-    if image_shape_len == 4:
-        batch, y_height, x_width, channels = image.shape
-    elif image_shape_len == 3 and image.shape[0] == 1:
-        batch, y_height, x_width = image.shape
-        channels = 1
-    elif image_shape_len == 3 and image.shape[2] == 1:
-        y_height, x_width, channels = image.shape
-        batch = 1
-    elif image_shape_len == 2:
-        y_height, x_width = image.shape
-        batch = 1
-        channels = 1
 
-    if color is None:
-        if channels == 1:
-            color = [255]
-        else:
-            color = [0, 255, 255]
-    image = np.squeeze(image)
-    y, x = np.array(coordinate, dtype=np.int32)
-    # please note that skimage uses a funky coordinate system:
-    # origin in the top left with coordinates ordered
-    # (y, x) where
-    # +y is down from the top left corner and
-    # +x is right from the top left corner
-    rr, cc, aa = circle_perimeter_aa(y, x, radius, shape=image.shape)
-    set_color(image, (rr, cc), color, alpha=aa)
-    # axs.imshow(np.squeeze(frame))
-    if image_shape_len > len(image.shape):
-        # return the image to the shape that was provided
-        image = np.expand_dims(image, axis=0)
+        Requires scikit-image, http://scikit-image.org
+        If it is not available this function is a no-op.
+    """
+    if circle_perimeter_aa is not None and set_color is not None:
+        image_shape_len = len(image.shape)
+        if image_shape_len == 4:
+            batch, y_height, x_width, channels = image.shape
+        elif image_shape_len == 3 and image.shape[0] == 1:
+            batch, y_height, x_width = image.shape
+            channels = 1
+        elif image_shape_len == 3 and image.shape[2] == 1:
+            y_height, x_width, channels = image.shape
+            batch = 1
+        elif image_shape_len == 2:
+            y_height, x_width = image.shape
+            batch = 1
+            channels = 1
+
+        if color is None:
+            if channels == 1:
+                color = [255]
+            else:
+                color = [0, 255, 255]
+        image = np.squeeze(image)
+        y, x = np.array(coordinate, dtype=np.int32)
+        # please note that skimage uses a funky coordinate system:
+        # origin in the top left with coordinates ordered
+        # (y, x) where
+        # +y is down from the top left corner and
+        # +x is right from the top left corner
+        rr, cc, aa = circle_perimeter_aa(y, x, radius, shape=image.shape)
+        set_color(image, (rr, cc), color, alpha=aa)
+        # axs.imshow(np.squeeze(frame))
+        if image_shape_len > len(image.shape):
+            # return the image to the shape that was provided
+            image = np.expand_dims(image, axis=0)
+
     return image

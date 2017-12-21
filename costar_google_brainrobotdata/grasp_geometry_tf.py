@@ -21,8 +21,6 @@ from keras import backend as K
 def depth_image_to_point_cloud(depth, intrinsics_matrix, dtype=tf.float32):
     """Depth images become an XYZ point cloud in the camera frame with shape (depth.shape[0], depth.shape[1], 3).
 
-    TODO(ahundt) Currently this version is broken and does not calculate a point cloud correctly.
-
     Transform a depth image into a point cloud in the camera frame with one point for each
     pixel in the image, using the camera transform for a camera
     centred at cx, cy with field of view fx, fy.
@@ -46,27 +44,37 @@ def depth_image_to_point_cloud(depth, intrinsics_matrix, dtype=tf.float32):
       transform: 4x4 Rt matrix for rotating and translating the point cloud
     """
     with K.name_scope('depth_image_to_point_cloud'):
-        # may need the following for indexing https://github.com/tensorflow/tensorflow/issues/206#issuecomment-338103956
-        fx = intrinsics_matrix[0, 0]
+        intrinsics_matrix = tf.to_float(intrinsics_matrix)
         fy = intrinsics_matrix[1, 1]
-        # center of image x coordinate
-        center_x = intrinsics_matrix[2, 0]
+        fx = intrinsics_matrix[0, 0]
         # center of image y coordinate
         center_y = intrinsics_matrix[2, 1]
-        # TODO(ahundt) make sure rot90 + fliplr is applied upstream in the dataset and to the depth images, ensure consistency with image intrinsics
-        depth = tf.image.flip_left_right(tf.image.rot90(depth, 3))
-        depth_shape_tensor = K.shape(depth)
-        x, y = tf.meshgrid(tf.range(0, depth_shape_tensor[0]),
-                           tf.range(0, depth_shape_tensor[1]),
+        # center of image x coordinate
+        center_x = intrinsics_matrix[2, 0]
+        depth = tf.to_float(tf.squeeze(depth))
+        # y, x
+        y_shape, x_shape = K.int_shape(depth)
+
+        y, x = tf.meshgrid(K.arange(y_shape),
+                           K.arange(x_shape),
                            indexing='ij')
 
         x = tf.to_float(K.flatten(x))
         y = tf.to_float(K.flatten(y))
         depth = K.flatten(depth)
-        X = tf.multiply((x - center_x), depth) / fx
-        Y = tf.multiply((y - center_y), depth) / fy
 
-        XYZ = tf.stack([K.flatten(X), K.flatten(Y), K.flatten(depth)])
-        XYZ = K.reshape(XYZ, [depth_shape_tensor[0], depth_shape_tensor[1], 3])
-        print('XYZ:', XYZ, 'depth_shape_tensor:', depth_shape_tensor)
+        assert K.int_shape(y) == K.int_shape(x)
+        assert K.int_shape(y) == K.int_shape(depth)
+
+        X = (x - center_x) * depth / fx
+        Y = (y - center_y) * depth / fy
+
+        assert K.int_shape(y) == K.int_shape(x)
+        assert K.int_shape(y) == K.int_shape(depth)
+
+        XYZ = K.stack([X, Y, depth], axis=-1)
+
+        assert K.int_shape(XYZ) == (y_shape * x_shape, 3)
+
+        XYZ = K.reshape(XYZ, [y_shape, x_shape, 3])
         return XYZ

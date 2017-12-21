@@ -163,16 +163,20 @@ def test_grasp_dataset_to_transforms_and_features():
 
 
 def test_depth_image_to_point_cloud():
-    depth = np.random.rand(10, 21, 1)
+    depth = np.random.rand(3, 5, 1)
     intrinsics = np.random.rand(3, 3)
     XYZ_numba = depth_image_to_point_cloud3(depth, intrinsics)
     XYZ_np = depth_image_to_point_cloud(depth, intrinsics)
     assert np.allclose(XYZ_numba, XYZ_np)
+    assert np.allclose(np.squeeze(XYZ_numba[:, :, 2]), np.squeeze(depth))
+    assert np.allclose(np.squeeze(XYZ_np[:, :, 2]), np.squeeze(depth))
     depth = np.random.rand(21, 10, 1)
     intrinsics = np.random.rand(3, 3)
     XYZ_numba = depth_image_to_point_cloud2(depth, intrinsics)
     XYZ_np = depth_image_to_point_cloud(depth, intrinsics)
     assert np.allclose(XYZ_numba, XYZ_np)
+    assert np.allclose(np.squeeze(XYZ_numba[:, :, 2]), np.squeeze(depth))
+    assert np.allclose(np.squeeze(XYZ_np[:, :, 2]), np.squeeze(depth))
 
     depth = np.random.rand(640, 512, 1)
     intrinsics = np.random.rand(3, 3)
@@ -198,9 +202,10 @@ def test_depth_image_to_point_cloud():
     for _ in tqdm(range(10), desc='depth_image_to_point_cloud_numba_intrinsics_matrix_direct'):
         XYZ = depth_image_to_point_cloud_numba(depth, intrinsics, XYZ)
     assert np.allclose(XYZ, XYZ_np)
+    assert np.allclose(np.squeeze(XYZ[:, :, 2]), np.squeeze(depth))
 
     with tf.Session() as sess:
-        depth = tf.convert_to_tensor(depth)
+        depth = tf.convert_to_tensor(np.squeeze(depth))
         intrinsics = tf.convert_to_tensor(intrinsics)
         XYZ_tf = grasp_geometry_tf.depth_image_to_point_cloud(depth, intrinsics)
         for _ in tqdm(range(10), desc='depth_image_to_point_cloud_tf'):
@@ -208,6 +213,7 @@ def test_depth_image_to_point_cloud():
         print('xyz', XYZ, 'XYZ_np', XYZ_np)
         assert XYZ.shape == XYZ_np.shape
         assert np.allclose(XYZ, XYZ_np)
+        assert np.allclose(np.squeeze(XYZ[:, :, 2]), np.squeeze(depth))
 
 
 if __name__ == '__main__':

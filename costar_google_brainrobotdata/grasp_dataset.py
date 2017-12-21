@@ -1168,7 +1168,7 @@ class GraspDataset(object):
         return dict_and_feature_tuple_list, features_complete_list, feature_count, attempt_count
 
     @staticmethod
-    def _image_decode(feature_op_dict, sensor_image_dimensions=None, image_features=None, decode_depth_as='depth', point_cloud_fn='tensorflow'):
+    def _image_decode(feature_op_dict, sensor_image_dimensions=None, image_features=None, decode_depth_as='depth', point_cloud_fn='numpy'):
         """ Add features to dict that supply decoded png and jpeg images for any encoded images present.
 
         Any feature path that is 'image/encoded' will also now have 'image/decoded', and 'image/xyz' when

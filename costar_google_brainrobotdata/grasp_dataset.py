@@ -76,7 +76,7 @@ flags.DEFINE_integer('random_crop_width', 560,
                      """Width to randomly crop images, if enabled""")
 flags.DEFINE_integer('random_crop_height', 448,
                      """Height to randomly crop images, if enabled""")
-flags.DEFINE_boolean('random_crop', True,
+flags.DEFINE_boolean('random_crop', False,
                      """random_crop will apply the tf random crop function with
                         the parameters specified by random_crop_width and random_crop_height
                      """)
@@ -84,7 +84,7 @@ flags.DEFINE_integer('resize_width', 80,
                      """Width to resize images before prediction, if enabled.""")
 flags.DEFINE_integer('resize_height', 64,
                      """Height to resize images before prediction, if enabled.""")
-flags.DEFINE_boolean('resize', True,
+flags.DEFINE_boolean('resize', False,
                      """resize will resize the input images to the desired dimensions specified but the
                         resize_width and resize_height flags. It is suggested that an exact factor of 2 be used
                         relative to the input image directions if random_crop is disabled or the crop dimensions otherwise.
@@ -1168,7 +1168,7 @@ class GraspDataset(object):
         return dict_and_feature_tuple_list, features_complete_list, feature_count, attempt_count
 
     @staticmethod
-    def _image_decode(feature_op_dict, sensor_image_dimensions=None, image_features=None, decode_depth_as='depth', point_cloud_fn='numpy'):
+    def _image_decode(feature_op_dict, sensor_image_dimensions=None, image_features=None, decode_depth_as='depth', point_cloud_fn='tensorflow'):
         """ Add features to dict that supply decoded png and jpeg images for any encoded images present.
 
         Any feature path that is 'image/encoded' will also now have 'image/decoded', and 'image/xyz' when

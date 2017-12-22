@@ -163,11 +163,25 @@ def test_grasp_dataset_to_transforms_and_features():
 
 
 def test_depth_image_to_point_cloud():
-    depth = np.random.rand(3, 5, 1)
+    steps = range(1)
+    depth = np.random.rand(2, 4, 1)
     intrinsics = np.random.rand(3, 3)
+
+    depth_tf = tf.convert_to_tensor(np.squeeze(depth))
+    intrinsics_tf = tf.convert_to_tensor(intrinsics)
     XYZ_numba = depth_image_to_point_cloud3(depth, intrinsics)
     XYZ_np = depth_image_to_point_cloud(depth, intrinsics)
+    XYZ_tf = grasp_geometry_tf.depth_image_to_point_cloud(depth_tf, intrinsics_tf)
+
+    with tf.Session() as sess:
+        XYZ_tf = sess.run(XYZ_tf)
+
+    print('XYZ_tf')
+    print(XYZ_tf)
+    print('XYZ_numba')
+    print(XYZ_numba)
     assert np.allclose(XYZ_numba, XYZ_np)
+    assert np.allclose(XYZ_numba, XYZ_tf)
     assert np.allclose(np.squeeze(XYZ_numba[:, :, 2]), np.squeeze(depth))
     assert np.allclose(np.squeeze(XYZ_np[:, :, 2]), np.squeeze(depth))
     depth = np.random.rand(21, 10, 1)
@@ -180,12 +194,12 @@ def test_depth_image_to_point_cloud():
 
     depth = np.random.rand(640, 512, 1)
     intrinsics = np.random.rand(3, 3)
-    for _ in tqdm(range(10), desc='depth_image_to_point_cloud_numba_intrinsics_matrix_wrapped'):
+    for _ in tqdm(steps, desc='depth_image_to_point_cloud_numba_intrinsics_matrix_wrapped'):
         XYZ_numba = depth_image_to_point_cloud3(depth, intrinsics)
-    for _ in tqdm(range(10), desc='depth_image_to_point_cloud2_numba_scalars'):
+    for _ in tqdm(steps, desc='depth_image_to_point_cloud2_numba_scalars'):
         XYZ_numba = depth_image_to_point_cloud2(depth, intrinsics)
 
-    for _ in tqdm(range(10), desc='depth_image_to_point_cloud_np'):
+    for _ in tqdm(steps, desc='depth_image_to_point_cloud_np'):
         XYZ_np = depth_image_to_point_cloud(depth, intrinsics)
 
     depth = np.squeeze(depth)
@@ -211,6 +225,7 @@ def test_depth_image_to_point_cloud():
         for _ in tqdm(range(10), desc='depth_image_to_point_cloud_tf'):
             XYZ = sess.run(XYZ_tf)
         print('xyz', XYZ, 'XYZ_np', XYZ_np)
+
         assert XYZ.shape == XYZ_np.shape
         assert np.allclose(XYZ, XYZ_np)
         assert np.allclose(np.squeeze(XYZ[:, :, 2]), np.squeeze(depth))

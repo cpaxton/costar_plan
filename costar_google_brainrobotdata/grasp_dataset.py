@@ -2015,7 +2015,7 @@ def get_multi_dataset_training_tensors(
 
     # initialize all datasets
     for single_dataset in datasets:
-        data = grasp_dataset.GraspDataset(dataset=single_dataset)
+        data = GraspDataset(dataset=single_dataset)
         grasp_dataset_list.append(data)
         dataset_batch_sizes.append(data.get_features()[1])
 

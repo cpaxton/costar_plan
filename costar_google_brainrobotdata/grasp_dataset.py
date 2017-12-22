@@ -2040,10 +2040,10 @@ def get_multi_dataset_training_tensors(
              grasp_sequence_max_time_step=grasp_sequence_max_time_step)
 
         max_num_samples = max(num_samples, max_num_samples)
-        pregrasp_op_batch.extend(pregrasp_op)
-        grasp_step_op_batch.extend(grasp_step_op)
-        simplified_grasp_command_op_batch.extend(simplified_grasp_command_op)
-        grasp_success_op_batch.extend(grasp_success_op)
+        pregrasp_op_batch.append(pregrasp_op)
+        grasp_step_op_batch.append(grasp_step_op)
+        simplified_grasp_command_op_batch.append(simplified_grasp_command_op)
+        grasp_success_op_batch.append(grasp_success_op)
         # make sure we visit every image once
 
     steps_per_epoch = int(np.ceil(float(max_num_samples)/float(batch_size)))
@@ -2053,7 +2053,10 @@ def get_multi_dataset_training_tensors(
     simplified_grasp_command_op_batch = tf.concat(simplified_grasp_command_op_batch, 0)
     print('grasp_success_op_batch before concat: ', grasp_success_op_batch)
     grasp_success_op_batch = tf.concat(grasp_success_op_batch, 0)
-    print('grasp_success_op_batch after concat: ', grasp_success_op_batch)
+    print('pregrasp_op_batch:', pregrasp_op_batch,
+          'grasp_step_op_batch:', grasp_step_op_batch,
+          'simplified_grasp_command_op_batch:', simplified_grasp_command_op_batch,
+          'grasp_success_op_batch:', grasp_success_op_batch)
 
     return pregrasp_op_batch, grasp_step_op_batch, simplified_grasp_command_op_batch, grasp_success_op_batch, steps_per_epoch
 

@@ -285,15 +285,24 @@ def endeffector_image_coordinate(camera_intrinsics_matrix, xyz):
     This is used to find the [y_height, x_width] image coordinate of the
     end effector given an xyz coordinate in the camera frame.
 
+    # Arguments
+
+    camera_intrinsics_matrix: a 3x3 camera intrinsics matrix
+    xyz: an (X, Y, Z) coordinate
+
+    # Returns
+
+    A [y, x] coordinate of the xyz point in the image coordinate system.
+
     """
 
     # get focal length and camera image center from the intrinsics matrix
-    fx = camera_intrinsics_matrix[0, 0]
     fy = camera_intrinsics_matrix[1, 1]
-    # center of image x coordinate
-    center_x = camera_intrinsics_matrix[2, 0]
+    fx = camera_intrinsics_matrix[0, 0]
     # center of image y coordinate
     center_y = camera_intrinsics_matrix[2, 1]
+    # center of image x coordinate
+    center_x = camera_intrinsics_matrix[2, 0]
 
     # Capital X is horizontal point, right in camera image frame
     # Capital Y is vertical point, up in camera image frame

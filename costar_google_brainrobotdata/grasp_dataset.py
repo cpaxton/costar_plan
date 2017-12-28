@@ -71,11 +71,11 @@ flags.DEFINE_string('grasp_dataset', '102',
                     around 110 GB and 38k grasp attempts.
                     See https://sites.google.com/site/brainrobotdata/home
                     for a full listing.""")
-flags.DEFINE_integer('random_crop_width', 560,
+flags.DEFINE_integer('random_crop_width', 60,
                      """Width to randomly crop images, if enabled""")
-flags.DEFINE_integer('random_crop_height', 448,
+flags.DEFINE_integer('random_crop_height', 60,
                      """Height to randomly crop images, if enabled""")
-flags.DEFINE_boolean('random_crop', False,
+flags.DEFINE_boolean('random_crop', True,
                      """random_crop will apply the tf random crop function with
                         the parameters specified by random_crop_width and random_crop_height
                      """)
@@ -961,7 +961,11 @@ class GraspDataset(object):
                 # define pixel image coordinate as an integer type
                 image_coordinate_current = tf.cast(image_coordinate_current, tf.int32)
                 image_coordinate_final = tf.cast(image_coordinate_final, tf.int32)
-
+                if random_crop:
+                    crop_offset_xy = tf.gather(fixed_feature_op_dict['random_crop_offset'], tf.constant([0, 1]))
+                    image_coordinate_current = image_coordinate_current + crop_offset_xy
+                    image_coordinate_final = image_coordinate_final + crop_offset_xy
+                
                 # camera_T_endeffector_current_vec_quat_7_array,
                 (fixed_feature_op_dict, features_complete_list, time_ordered_feature_name_dict) = add_feature_op(
                     fixed_feature_op_dict, features_complete_list, time_ordered_feature_name_dict,

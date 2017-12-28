@@ -76,35 +76,9 @@ class random_crop_test(tf.test.TestCase):
             offset_np = sess.run(offset_tf)
 
             crop_XYZ_np = depth_image_to_point_cloud(rcp_crop_np, cropped_intrinsics_np)
-
             assert np.allclose(np.squeeze(crop_XYZ_np[:, :, 0]),
-                np.squeeze(XYZ_np[offset_np[0]:offset_np[0] + crop_size_np[0],
-                                    offset_np[1]:offset_np[1] + crop_size_np[1], 0]))
-
-    def test_crop_pointcloud_np(self):
-        """ Test pointcloud use random crop np array directly
-        """
-        with self.test_session() as sess:
-            test_input = np.random.rand(30, 20)
-            intrinsics = np.random.rand(3, 3)
-            offset_np = np.array([3, 4, 1])
-            crop_size_np = np.array([5, 4, 1])
-
-            crop_intrinsics_np = np.copy(intrinsics)
-            crop_intrinsics_np[2, 0] -= offset_np[0]
-            crop_intrinsics_np[2, 1] -= offset_np[1]
-
-            XYZ_np = depth_image_to_point_cloud(test_input, intrinsics)
-
-            crop_input = test_input[offset_np[0]:offset_np[0]+crop_size_np[0],
-                                    offset_np[1]:offset_np[1]+crop_size_np[1]]
-            crop_XYZ_np = depth_image_to_point_cloud(crop_input, crop_intrinsics_np)
-            crop_XYZ_np = crop_XYZ_np[:, :, 0]
-            # Choose Axis 0 in pointcloud
-            offset_XYZ_np = XYZ_np[offset_np[0]:offset_np[0]+crop_size_np[0],
-                                   offset_np[1]:offset_np[1]+crop_size_np[1], 0]
-
-            assert np.allclose(crop_XYZ_np, offset_XYZ_np)
+                np.squeeze(XYZ_np[offset_np[1]:offset_np[1] + crop_size_np[1],
+                                  offset_np[0]:offset_np[0] + crop_size_np[0], 0]))
 
 if __name__ == '__main__':
     tf.test.main()

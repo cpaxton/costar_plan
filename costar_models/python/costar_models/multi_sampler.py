@@ -837,66 +837,6 @@ class RobotMultiPredictionSampler(RobotMultiHierarchical):
         decoder.summary()
         return decoder
 
-
-    def _makeEncoder2(self, img_shape, arm_size, gripper_size, disc=False):
-        '''
-        Redefine the creation of the encoder here. This version has a couple
-        different options.
-        '''
-        img = Input(img_shape)
-        arm = Input((arm_size,))
-        gripper = Input((gripper_size,))
-        option = Input((1,))
-        if disc:
-            activation = "lrelu"
-        else:
-            activation = "relu"
-
-        skips = []
-
-        # First block
-        x = AddConv2D(x, 16, [5,5], 1, self.dropout_rate, "same", disc)
-        skips.append(x)
-
-        # Second block
-        x = AddConv2D(x, 32, [5,5], 2, self.dropout_rate, "same", disc)
-        skips.append(x)
-
-        # Third block
-        x = AddConv2D(x, 64, [5,5], 2, self.dropout_rate, "same", disc)
-        skips.append(x)
-
-        # Fourth block
-        x = AddConv2D(x, 64, [5,5], 1, self.dropout_rate, "same", disc)
-        skips.append(x)
-
-        # Fifth block
-        # Add label information
-        # Add arm, gripper information
-        o = OneHot(self.num_options)(option)
-        o = Flatten()(o)
-        a = AddDense(a, self.pose_col_dim, activation, self.dropout_rate)
-        a = Concatenate()([a,o])
-        x = TileOnto(x, a, self.pose_col_dim, [4,4])
-        x = AddConv2D(x, 64, [5,5], 1, self.dropout_rate, "valid", disc)
-        x = AddConv2D(x, 64, [5,5], 1, self.dropout_rate, "valid", disc)
-        if self.use_spatial_softmax:
-            def _ssm(x):
-                return spatial_softmax(x)
-            x = Lambda(_ssm,name="encoder_spatial_softmax")(x)
-
-        return x
-
-    def _makeDecoder2(self, img_shape, arm_size, gripper_size):
-
-        # Compute the correct skip connections to include
-        skip_sizes = [32, 64]
-        skips = self.steps_up - self.steps_up_no_skip
-        skip_sizes = skip_sizes[:skips]
-        skip_sizes.reverse()
-
-        pass
-
     def _makeStateEncoder(self, arm_size, gripper_size, disc=False):
         '''
         Encode arm state.
@@ -939,16 +879,15 @@ class RobotMultiPredictionSampler(RobotMultiHierarchical):
         gripper_size: number of gripper output variables to predict
         '''
         rep_in = Input((8,8,rep_channels,))
-        dr = self.decoder_dropout_rate
+        dr = self.decoder_dropout_rate 
 
         x = rep_in
-        x = AddConv2D(x, 32, [3,3], 1, dr, "same", False)
-        x = AddConv2D(x, 64, [3,3], 2, dr, "same", False)
-        x = AddConv2D(x, 64, [3,3], 1, dr, "same", False)
+        x = AddConv2D(x, 64, [3,3], 2, 0., "same", False)
+        x = AddConv2D(x, 64, [3,3], 1, 0., "same", False)
         x = Flatten()(x)
         x1 = AddDense(x, 512, "relu", 0.)
         x1 = AddDense(x1, 512, "relu", 0.)
-        x2 = AddDense(x, 512, "relu", 0.)
+        x2 = AddDense(x, 256, "relu", 0.)
         arm = AddDense(x1, arm_size, "linear", 0., output=True)
         gripper = AddDense(x1, gripper_size, "sigmoid", 0., output=True)
         #y = AddDense(x, 512, "relu", dr, output=True)
@@ -989,10 +928,10 @@ class RobotMultiPredictionSampler(RobotMultiHierarchical):
         dr = self.dropout_rate
         x = img
         x = AddConv2D(x, 32, [5,5], 2, dr, "same", disc)
-        x = AddConv2D(x, 32, [5,5], 1, dr, "same", disc)
-        x = AddConv2D(x, 32, [5,5], 1, dr, "same", disc)
+        x = AddConv2D(x, 32, [5,5], 1, 0., "same", disc)
+        x = AddConv2D(x, 32, [5,5], 1, 0., "same", disc)
         x = AddConv2D(x, 64, [5,5], 2, dr, "same", disc)
-        x = AddConv2D(x, 64, [5,5], 1, dr, "same", disc)
+        x = AddConv2D(x, 64, [5,5], 1, 0., "same", disc)
         x = AddConv2D(x, 128, [5,5], 2, dr, "same", disc)
         self.encoder_channels = 8
         x = AddConv2D(x, self.encoder_channels, [1,1], 1, 0.*dr,
@@ -1064,11 +1003,11 @@ class RobotMultiPredictionSampler(RobotMultiHierarchical):
         x = AddConv2DTranspose(x, 128, [1,1], 1, 0.*dr)
         #x = AddConv2DTranspose(x, 64, [5,5], 2, dr)
         x = AddConv2DTranspose(x, 64, [5,5], 2, dr)
-        x = AddConv2DTranspose(x, 64, [5,5], 1, dr)
+        x = AddConv2DTranspose(x, 64, [5,5], 1, 0.)
         x = AddConv2DTranspose(x, 32, [5,5], 2, dr)
-        x = AddConv2DTranspose(x, 32, [5,5], 1, dr)
+        x = AddConv2DTranspose(x, 32, [5,5], 1, 0.)
         x = AddConv2DTranspose(x, 32, [5,5], 2, dr)
-        x = AddConv2DTranspose(x, 32, [5,5], 1, dr)
+        x = AddConv2DTranspose(x, 32, [5,5], 1, 0.)
         if self.skip_connections and img_shape is not None:
             x = Concatenate(axis=-1)([x, skip])
             ins = [rep, skip]

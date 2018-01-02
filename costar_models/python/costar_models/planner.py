@@ -813,8 +813,8 @@ def GetNextOptionAndValue(x, num_options, dense_size, dropout_rate=0.5, option_i
     x2 = DenseHelper(x, dense_size, dropout_rate, 1)
 
     next_option_out = Dense(num_options,
-            activation="softmax", name="next_label_out",)(x1)
-    value_out = Dense(1, activation="sigmoid", name="value_out",)(x2)
+            activation="softmax", name="next_label",)(x1)
+    value_out = Dense(1, activation="sigmoid", name="value",)(x2)
     return value_out, next_option_out
 
 

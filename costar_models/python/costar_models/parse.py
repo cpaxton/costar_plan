@@ -137,7 +137,7 @@ def GetModelParser():
     parser.add_argument("--skip_connections", "--sc",
                         help="use skip connections to generate better outputs",
                         type=int,
-                        default=1)
+                        default=0)
     parser.add_argument("--decoder_dropout_rate", "--ddr",
                         help="specify a separate dropout for the model decoder",
                         type=float,

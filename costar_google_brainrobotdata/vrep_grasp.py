@@ -72,7 +72,7 @@ tf.flags.DEFINE_boolean('vrepDoNotReconnectOnceDisconnected', True, '')
 tf.flags.DEFINE_integer('vrepTimeOutInMs', 5000, 'Timeout in milliseconds upon which connection fails')
 tf.flags.DEFINE_integer('vrepCommThreadCycleInMs', 5, 'time between communication cycles')
 tf.flags.DEFINE_integer('vrepVisualizeGraspAttempt_min', 0, 'min grasp attempt to display from dataset, or -1 for no limit')
-tf.flags.DEFINE_integer('vrepVisualizeGraspAttempt_max', 1, 'max grasp attempt to display from dataset, exclusive, or -1 for no limit')
+tf.flags.DEFINE_integer('vrepVisualizeGraspAttempt_max', 100, 'max grasp attempt to display from dataset, exclusive, or -1 for no limit')
 tf.flags.DEFINE_string('vrepDebugMode', 'save_ply,print_transform',
                        """Options are: '', 'fixed_depth', 'save_ply', 'print_transform', 'print_drawLines'.
                        More than one option can be specified at a time with comma or space separation.""")
@@ -111,7 +111,7 @@ tf.flags.DEFINE_string('vrepVisualizeRGBFormat', 'vrep_rgb',
                             Examples include 'vrep_depth_rgb' and 'vrep_depth_encoded_rgb',
                             see http://www.forum.coppeliarobotics.com/viewtopic.php?f=9&t=737&p=27805#p27805.
                        """)
-tf.flags.DEFINE_string('vrepVisualizationPipeline', 'python',
+tf.flags.DEFINE_string('vrepVisualizationPipeline', 'tensorflow',
                        """Options are: python, tensorflow.
                            'tensorflow' tensorflow loads the raw data from the dataset and
                                calculates all features before they are rendered with vrep via python,
@@ -608,10 +608,15 @@ class VREPGraspVisualization(object):
             # Visualize point clouds
             if FLAGS.vrepVisualizeRGBD:
                 # display clear view point cloud
+                # show the median filtered or the raw xyz + depth images depending on user selection
+                if FLAGS.median_filter:
+                    depth_image = time_ordered_feature_data_dict['move_to_grasp/time_ordered/clear_view/depth_image/median_filtered'][0]
+                else:
+                    depth_image = time_ordered_feature_data_dict['move_to_grasp/time_ordered/clear_view/depth_image/decoded'][0]
                 create_point_cloud(
                     self.client_id, 'clear_view_cloud',
                     transform=base_to_camera_vec_quat_7,
-                    depth_image=time_ordered_feature_data_dict['move_to_grasp/time_ordered/clear_view/depth_image/decoded'][0],
+                    depth_image=depth_image,
                     color_image=time_ordered_feature_data_dict['move_to_grasp/time_ordered/clear_view/rgb_image/decoded'][0],
                     parent_handle=parent_handle,
                     rgb_sensor_display_name='kcam_rgb_clear_view',
@@ -627,8 +632,13 @@ class VREPGraspVisualization(object):
 
                 # Walk through all the other images from initial time step to final time step
                 rgb_images = time_ordered_feature_data_dict['move_to_grasp/time_ordered/rgb_image/decoded']
-                depth_images = time_ordered_feature_data_dict['move_to_grasp/time_ordered/depth_image/decoded']
-                xyz_images = time_ordered_feature_data_dict['move_to_grasp/time_ordered/xyz_image/decoded']
+                # show the median filtered or the raw xyz + depth images depending on user selection
+                if FLAGS.median_filter:
+                    depth_images = time_ordered_feature_data_dict['move_to_grasp/time_ordered/depth_image/median_filtered']
+                    xyz_images = time_ordered_feature_data_dict['move_to_grasp/time_ordered/xyz_image/median_filtered']
+                else:
+                    depth_images = time_ordered_feature_data_dict['move_to_grasp/time_ordered/depth_image/decoded']
+                    xyz_images = time_ordered_feature_data_dict['move_to_grasp/time_ordered/xyz_image/decoded']
                 current_coordinates = time_ordered_feature_data_dict[current_coordinate_name]
                 final_coordinates = time_ordered_feature_data_dict[final_coordinate_name]
 

@@ -62,7 +62,7 @@ flags.DEFINE_string('load_weights', 'grasp_model_weights.h5',
                     """Load and continue training the specified file containing model weights.""")
 flags.DEFINE_integer('epochs', 300,
                      """Epochs of training""")
-flags.DEFINE_string('grasp_dataset_eval', '097',
+flags.DEFINE_string('grasp_dataset_eval', '057',
                     """Filter the subset of 1TB Grasp datasets to evaluate.
                     097 by default. It is important to ensure that this selection
                     is completely different from the selected training datasets
@@ -115,7 +115,7 @@ flags.DEFINE_string('learning_rate_scheduler', 'learning_rate_scheduler',
 flags.DEFINE_string('optimizer', 'SGD', """Options are Adam and SGD.""")
 flags.DEFINE_string('progress_tracker', 'tensorboard',
                     """Utility to follow training progress, options are tensorboard and None.""")
-flags.DEFINE_string('loss', 'segmentation_single_pixel_binary_crossentropy',
+flags.DEFINE_string('loss', 'segmentation_gaussian_binary_crossentropy',
                     """Options are binary_crossentropy, segmentation_single_pixel_binary_crossentropy,
                        and segmentation_gaussian_binary_crossentropy.""")
 flags.DEFINE_string('metric', 'segmentation_single_pixel_binary_accuracy',

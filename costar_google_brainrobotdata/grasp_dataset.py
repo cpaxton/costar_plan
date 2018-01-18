@@ -68,7 +68,7 @@ flags.DEFINE_integer('sensor_color_channels', 3,
                      'Number of color channels (3, RGB)')
 flags.DEFINE_boolean('grasp_download', False,
                      """Download the grasp_dataset to data_dir if it is not already present.""")
-flags.DEFINE_string('grasp_dataset', '102',
+flags.DEFINE_string('grasp_dataset', '052',
                     """Filter the subset of 1TB Grasp datasets to run.
                     None by default. 'all' will run all datasets in data_dir.
                     '052' and '057' will download the small starter datasets.
@@ -223,7 +223,7 @@ flags.DEFINE_string(
     """)
 
 # MULTI DATASET AGGREGATION PARAMETERS, see get_multi_dataset_training_tensors()
-flags.DEFINE_string('grasp_datasets_train', '062_b,063,072_a,082_b,102',
+flags.DEFINE_string('grasp_datasets_train', '052',
                     """Filter multiple subsets of 1TB Grasp datasets to train.
 
                     For use with get_multi_dataset_training_tensors() when training

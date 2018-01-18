@@ -1,0 +1,30 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "",
+        "limitSymbolsToIncludedHeaders": true
+      },
+      "includePath": [
+        "/home/ding/src/costar_ws/devel/include",
+        "/opt/ros/kinetic/include",
+        "/home/ding/src/costar_ws/src/ar_track_alvar/ar_track_alvar/include",
+        "/home/ding/src/costar_ws/src/costar_stack/costar_perception/color_nn_segmenter/include",
+        "/home/ding/src/costar_ws/src/iiwa_stack/iiwa_hw/include",
+        "/home/ding/src/costar_ws/src/iiwa_stack/iiwa_ros/include",
+        "/home/ding/src/costar_ws/src/costar_stack/costar_tools/moveit_collision_environment/include",
+        "/home/ding/src/costar_ws/src/costar_stack/costar_tools/object_on_table_segmenter/include",
+        "/home/ding/src/costar_ws/src/robotiq/robotiq_action_server/include",
+        "/home/ding/src/costar_ws/src/robotiq/robotiq_c_model_control/include",
+        "/home/ding/src/costar_ws/src/robotiq/robotiq_ethercat/include",
+        "/home/ding/src/costar_ws/src/robotiq/robotiq_force_torque_sensor/include",
+        "/home/ding/src/costar_ws/src/robotiq/robotiq_s_model_control/include",
+        "/home/ding/src/costar_ws/src/costar_stack/costar_perception/sp_segmenter/include",
+        "/home/ding/src/costar_ws/src/universal_robot/ur_kinematics/include",
+        "/home/ding/src/costar_ws/src/ur_modern_driver/include",
+        "/usr/include"
+      ],
+      "name": "Linux"
+    }
+  ]
+}

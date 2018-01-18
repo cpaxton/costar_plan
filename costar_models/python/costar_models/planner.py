@@ -114,7 +114,7 @@ def AddConv2DTranspose(x, filters, kernel, stride, dropout_rate,
     return x
 
 def AddDense(x, size, activation, dropout_rate, output=False, momentum=0.9,
-    constraint=3):
+    constraint=3, bn=True):
     '''
     Add a single dense block with batchnorm and activation.
 
@@ -133,7 +133,7 @@ def AddDense(x, size, activation, dropout_rate, output=False, momentum=0.9,
         x = Dense(size, kernel_constraint=maxnorm(constraint))(x)
     else:
         x = Dense(size)(x)
-    if not output:
+    if not output and bn:
         x = BatchNormalization(momentum=momentum)(x)
     if activation == "lrelu":
         x = LeakyReLU(alpha=0.2)(x)

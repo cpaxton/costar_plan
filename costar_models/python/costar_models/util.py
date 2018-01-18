@@ -6,6 +6,7 @@ from .multi_conv_lstm_regression import RobotMultiConvLSTMRegression
 from .multi_trajectory_sampler import RobotMultiTrajectorySampler
 from .multi_autoencoder_model import RobotMultiAutoencoder
 from .multi_hierarchical import RobotMultiHierarchical
+from .multi_policy import RobotPolicy
 
 # Model for sampling predictiosn
 from .multi_sampler import RobotMultiPredictionSampler
@@ -81,6 +82,10 @@ def MakeModel(features, model, taskdef, **kwargs):
             model_instance = RobotMultiHierarchical(taskdef,
                     model=model,
                     **kwargs)
+        elif model == "policy":
+            model_instance = RobotPolicy(taskdef,
+                    model=model,
+                    **kwargs)
         elif model == "husky_predictor":
             model_instance = HuskyRobotMultiPredictionSampler(taskdef,
                     model=model,
@@ -127,6 +132,7 @@ def GetModels():
             "conv_lstm_regression", # lstm regression model
             "predictor", # sampler NN to generate image goals
             "hierarchical", # hierarchical policy for planning
+            "policy", # single policy hierarchical
             "husky_predictor", # husky multi prediction sampler implementation
             "goal_sampler", # samples goals instead of everything else
             "image_sampler", #just learn to predict goal image

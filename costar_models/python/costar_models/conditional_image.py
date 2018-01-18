@@ -89,8 +89,8 @@ class ConditionalImage(PredictionSampler2):
             #encoder0 = self._makeImageEncoder(img_shape, copy=True)
         try:
             encoder.load_weights(self._makeName(
-                "pretrain_image_encoder_model",
-                #"pretrain_image_gan_model",
+                #"pretrain_image_encoder_model",
+                "pretrain_image_gan_model",
                 "image_encoder.h5f"))
             encoder.trainable = self.retrain
             #encoder0.load_weights(self._makeName(
@@ -107,8 +107,8 @@ class ConditionalImage(PredictionSampler2):
             decoder = self._makeImageDecoder(self.hidden_shape)
         try:
             decoder.load_weights(self._makeName(
-                "pretrain_image_encoder_model",
-                #"pretrain_image_gan_model",
+                #"pretrain_image_encoder_model",
+                "pretrain_image_gan_model",
                 "image_decoder.h5f"))
             decoder.trainable = self.retrain
         except Exception as e:
@@ -185,7 +185,7 @@ class ConditionalImage(PredictionSampler2):
             train_predictor.compile(
                     loss=[lfn, lfn, "binary_crossentropy", val_loss,
                         lfn2, lfn2],
-                    loss_weights=[1., 1., 0.1, 0.1, 1., 0.2],
+                    loss_weights=[1., 0.5, 0.1, 0.1, 1., 0.2],
                     optimizer=self.getOptimizer())
         else:
             train_predictor = Model(ins + [label_in],

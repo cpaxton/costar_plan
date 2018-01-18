@@ -62,7 +62,7 @@ class RobotMultiHierarchical(HierarchicalAgentBasedModel):
 
         self.use_spatial_softmax = False
 
-    def _makeModel(self, features, arm, gripper, arm_cmd, gripper_cmd, *args, **kwargs):
+    def _makeModel(self, features, arm, gripper, _, arm_cmd, gripper_cmd, *args, **kwargs):
         '''
         Set up all models necessary to create actions
         '''
@@ -114,6 +114,7 @@ class RobotMultiHierarchical(HierarchicalAgentBasedModel):
                 discriminator=False,
                 kernel_size=[3,3],
                 tile=True,
+                batchnorm=self.use_batchnorm,
                 pre_tiling_layers=1,
                 post_tiling_layers=3,
                 stride1_post_tiling_layers=1)
@@ -131,7 +132,141 @@ class RobotMultiHierarchical(HierarchicalAgentBasedModel):
 
     def _makeConditionalActor(self, features, arm, gripper, arm_cmd, gripper_cmd, *args, **kwargs):
         '''
-        This creates a "dumb" actor model 
+        This creates a "dumb" actor model based on a set of features.
+        '''
+        img_shape = features.shape[1:]
+        arm_size = arm.shape[1]
+        arm_cmd_size = arm_cmd.shape[1]
+        if len(gripper.shape) > 1:
+            gripper_size = gripper.shape[1]
+        else:
+            gripper_size = 1
+        
+        new = True
+        if not new:
+            ins, x, skips = GetEncoder(
+                    img_shape,
+                    [arm_size, gripper_size],
+                    self.img_col_dim,
+                    self.dropout_rate,
+                    self.img_num_filters,
+                    pose_col_dim=self.pose_col_dim,
+                    discriminator=False,
+                    kernel_size=[3,3],
+                    tile=True,
+                    batchnorm=self.use_batchnorm,
+                    pre_tiling_layers=1,
+                    post_tiling_layers=3,
+                    stride1_post_tiling_layers=1,
+                    option=self.num_options,
+                    )
+        else:
+            img_in = Input(img_shape, name="ca_img_in")
+            x = img_in
+            x = AddConv2D(x, 64, [5,5], 2, self.dropout_rate, "valid", bn=self.use_batchnorm)
+            x = AddConv2D(x, 128, [3,3], 2, self.dropout_rate, "valid", bn=self.use_batchnorm)
+            x = AddConv2D(x, 128, [3,3], 1, 0., "valid", bn=self.use_batchnorm)
+            x = AddConv2D(x, 128, [3,3], 1, 0., "valid", bn=self.use_batchnorm)
+            x = AddConv2D(x, 128, [3,3], 1, 0., "valid", bn=self.use_batchnorm)
+
+            arm_in = Input((arm_size,),name="ca_arm_in")
+            gripper_in = Input((gripper_size,),name="ca_gripper_in")
+            y = Concatenate()([arm_in, gripper_in])
+            y = AddDense(y, 128, "relu", 0., output=True, constraint=3)
+            x = TileOnto(x, y, 128, (8,8), add=True)
+
+            cmd_in = Input((1,), name="option_cmd_in")
+            cmd = OneHot(self.num_options)(cmd_in)
+            cmd = AddDense(cmd, 128, "relu", 0., output=True, constraint=3)
+            x = TileOnto(x, cmd, 128, (8,8), add=True)
+            x = AddConv2D(x, 64, [3,3], 1, self.dropout_rate, "valid",
+                    bn=self.use_batchnorm)
+            #x = BatchNormalization()(x)
+            x = Flatten()(x)
+            x = AddDense(x, 512, "relu", 0.,
+                    constraint=3,
+                    output=True)
+            x = Dropout(self.dropout_rate)(x)
+            x = AddDense(x, 512, "relu", 0.,
+                    constraint=3,
+                    output=True)
+
+
+
+        arm_out = Dense(arm_cmd_size, name="arm")(x)
+        gripper_out = Dense(gripper_size, name="gripper")(x)
+
+        if self.model is not None:
+            raise RuntimeError('overwriting old model!')
+
+        model = Model(ins, [arm_out, gripper_out])
+        optimizer = self.getOptimizer()
+        model.compile(loss=self.loss, optimizer=optimizer)
+        return model
+
+
+    def _makeAll(self, features, arm, gripper, arm_cmd, gripper_cmd, *args, **kwargs):
+        images = features
+        img_shape = images.shape[1:]
+        arm_size = arm.shape[-1]
+        if len(gripper.shape) > 1:
+            gripper_size = gripper.shape[-1]
+        else:
+            gripper_size = 1
+
+        ins, x, skips = GetEncoder(
+                img_shape,
+                [arm_size, gripper_size],
+                self.img_col_dim,
+                self.dropout_rate,
+                self.img_num_filters,
+                pose_col_dim=self.pose_col_dim,
+                kernel_size=[3,3],
+                tile=True,
+                pre_tiling_layers=1,
+                post_tiling_layers=3,
+                stride1_post_tiling_layers=1,
+                discriminator=False,
+                dense=False,
+                option=self.num_options,
+                flatten=False,
+                )
+
+        # =====================================================================
+        # SUPERVISOR
+        # Predict the next option -- does not depend on option
+        for _ in range(2):
+            # Repeat twice to scale down to a very small size -- this will help
+            # a little with the final image layers
+            x = Conv2D(int(self.img_num_filters),
+                    kernel_size=[5, 5], 
+                    strides=(2, 2),
+                    padding='same')(x)
+            x = Dropout(self.dropout_rate)(x)
+            x = LeakyReLU(0.2)(x)
+        x = Flatten()(x)
+        x = Dense(self.combined_dense_size)(x)
+        x = Dropout(self.dropout_rate)(x)
+        x = LeakyReLU(0.2)(x)
+        label_out = Dense(self.num_options, activation="softmax",name="next_option")(x)
+
+        supervisor = Model(ins, label_out, name="supervisor")
+        actor = self._makeConditionalActor(features, arm, gripper, arm_cmd,
+                gripper_cmd, *args, **kwargs)
+
+        supervisor.summary()
+        print("make model setup")
+        print(ins, actor.inputs)
+        #model_ins = Input(name="img_in")
+
+    def _makePolicy(self, encoder, features, arm, gripper,
+            arm_cmd, gripper_cmd, option):
+        '''
+        Create a single policy corresponding to option 
+
+        Parameters:
+        -----------
+        option: index of the policy to create
         '''
         img_shape = features.shape[1:]
         arm_size = arm.shape[1]
@@ -141,74 +276,23 @@ class RobotMultiHierarchical(HierarchicalAgentBasedModel):
         else:
             gripper_size = 1
 
+        h = encoder(img_in)
+        x = Flatten()(h)
+        h0 = encoder(img0_in)
+        x0 = Flatten()(h0)
+        arm = Input((arm_size,), name="ee_in")
+        gripper = Input((gripper_size,), name="gripper_in")
+        ins = Concatenate()([x0, x, arm, gripper])
 
-        #ins, x, skips = GetEncoder(
-        #        img_shape,
-        #        [arm_size, gripper_size],
-        #        self.img_col_dim,
-        #        self.dropout_rate,
-        #        self.img_num_filters,
-        #        pose_col_dim=self.pose_col_dim,
-        #        discriminator=False,
-        #        kernel_size=[3,3],
-        #        tile=True,
-        #        batchnorm=self.use_batchnorm,
-        #        option=self.num_options,
-        #        pre_tiling_layers=1,
-        #        post_tiling_layers=3,
-        #        stride1_post_tiling_layers=1)
-        img_in = Input(img_shape, name="ca_img_in")
-        x = img_in
-        x = AddConv2D(x, 64, [5,5], 2, self.dropout_rate, "valid", bn=self.use_batchnorm)
-        x = AddConv2D(x, 128, [3,3], 2, self.dropout_rate, "valid", bn=self.use_batchnorm)
-        x = AddConv2D(x, 128, [3,3], 1, 0., "valid", bn=self.use_batchnorm)
-        x = AddConv2D(x, 128, [3,3], 1, 0., "valid", bn=self.use_batchnorm)
-        x = AddConv2D(x, 128, [3,3], 1, 0., "valid", bn=self.use_batchnorm)
+        x = AddDense(x, 512, "lrelu", dr, output=True, bn=False)
 
-        arm_in = Input((arm_size,),name="ca_arm_in")
-        gripper_in = Input((gripper_size,),name="ca_gripper_in")
-        y = Concatenate()([arm_in, gripper_in])
-        y = AddDense(y, 128, "relu", 0., output=True, constraint=3)
-        x = TileOnto(x, y, 128, (8,8), add=True)
+        gripper_out = Dense(gripper_size, name="gripper" + str(option))(x)
+        arm_out = Dense(arm_cmd_size, name="arm" + str(option))(x)
 
-        cmd_in = Input((1,), name="option_cmd_in")
-        cmd = OneHot(self.num_options)(cmd_in)
-        cmd = AddDense(cmd, 128, "relu", 0., output=True, constraint=3)
-        x = TileOnto(x, cmd, 128, (8,8), add=True)
-        x = AddConv2D(x, 64, [3,3], 1, self.dropout_rate, "valid",
-                bn=self.use_batchnorm)
-        #x = BatchNormalization()(x)
-        x = Flatten()(x)
-        x = AddDense(x, 512, "relu", 0.,
-                constraint=3,
-                output=True)
-        x = Dropout(self.dropout_rate)(x)
-        x = AddDense(x, 512, "relu", 0.,
-                constraint=3,
-                output=True)
-
-        arm_out = Dense(arm_cmd_size, name="arm")(x)
-        gripper_out = Dense(gripper_size, name="gripper")(x)
-
-        if self.model is not None:
-            raise RuntimeError('overwriting old model!')
-
-        #model = Model(ins + [option_in], [arm_out, gripper_out])
-        ins = [img_in, arm_in, gripper_in, cmd_in]
         model = Model(ins, [arm_out, gripper_out])
-        optimizer = self.getOptimizer()
-        model.compile(loss=self.loss, optimizer=optimizer)
+        model.compile(loss=self.loss, optimizer=self.getOptimizer())
+        model.summary()
         return model
-
-    def _makePolicy(self, option):
-        '''
-        Create a single policy corresponding to option 
-
-        Parameters:
-        -----------
-        option: index of the policy to create
-        '''
-        pass
 
     def plotInfo(self, features, targets, axes):
         # debugging: plot every 5th image from the dataset
@@ -335,10 +419,13 @@ class RobotMultiHierarchical(HierarchicalAgentBasedModel):
             raise RuntimeError('save() failed: model not found.')
 
     def trainFromGenerators(self, train_generator, test_generator, data=None, *args, **kwargs):
-        [features, arm, gripper, oi], [arm_cmd, gripper_cmd] = self._getData(**data)
+        #[features, arm, gripper, oi], [arm_cmd, gripper_cmd] = self._getData(**data)
+        in_l, out_l = self._getData(**data)
+
+        # concatenate all the arguments for splatting
+        args = in_l + out_l + list(args)
         if self.model is None:
-            self._makeModel(features, arm, gripper, arm_cmd,
-                    gripper_cmd, *args, **kwargs)
+            self._makeModel(*args, **kwargs)
         self.model.summary()
         self.model.fit_generator(
                 train_generator,
@@ -358,20 +445,21 @@ class RobotMultiHierarchical(HierarchicalAgentBasedModel):
               we handle things slightly differently.
         '''
         img = Input(img_shape,name="img_encoder_in")
+        bn = not disc and self.use_batchnorm
         #img0 = Input(img_shape,name="img0_encoder_in")
         dr = self.dropout_rate
         x = img
         #x0 = img0
-        x = AddConv2D(x, 32, [7,7], 1, 0., "same", lrelu=disc, bn=(not disc))
-        #x0 = AddConv2D(x0, 32, [7,7], 1, dr, "same", lrelu=disc, bn=(not disc))
+        x = AddConv2D(x, 32, [7,7], 1, 0., "same", lrelu=disc, bn=bn)
+        #x0 = AddConv2D(x0, 32, [7,7], 1, dr, "same", lrelu=disc, bn=bn)
         #x = Concatenate(axis=-1)([x,x0])
 
-        x = AddConv2D(x, 32, [5,5], 2, dr, "same", lrelu=disc, bn=(not disc))
-        x = AddConv2D(x, 32, [5,5], 1, 0., "same", lrelu=disc, bn=(not disc))
-        x = AddConv2D(x, 32, [5,5], 1, 0., "same", lrelu=disc, bn=(not disc))
-        x = AddConv2D(x, 64, [5,5], 2, dr, "same", lrelu=disc, bn=(not disc))
-        x = AddConv2D(x, 64, [5,5], 1, 0., "same", lrelu=disc, bn=(not disc))
-        x = AddConv2D(x, 128, [5,5], 2, dr, "same", lrelu=disc, bn=(not disc))
+        x = AddConv2D(x, 32, [5,5], 2, dr, "same", lrelu=disc, bn=bn)
+        x = AddConv2D(x, 32, [5,5], 1, 0., "same", lrelu=disc, bn=bn)
+        x = AddConv2D(x, 32, [5,5], 1, 0., "same", lrelu=disc, bn=bn)
+        x = AddConv2D(x, 64, [5,5], 2, dr, "same", lrelu=disc, bn=bn)
+        x = AddConv2D(x, 64, [5,5], 1, 0., "same", lrelu=disc, bn=bn)
+        x = AddConv2D(x, 128, [5,5], 2, dr, "same", lrelu=disc, bn=bn)
 
         if self.use_spatial_softmax and not disc:
             def _ssm(x):

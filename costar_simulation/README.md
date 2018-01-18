@@ -10,3 +10,7 @@ This is probably the most relevant scenario.
 rosrun costar_simulation --launch ur5 --experiment stack
 ```
 
+## Fetch
+
+## Husky
+

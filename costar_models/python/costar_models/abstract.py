@@ -44,6 +44,7 @@ class AbstractAgentBasedModel(object):
             hidden_size=128,
             loss="mae",
             num_generator_files=3, upsampling=None,
+            option=None, # for policy model
             task=None, robot=None, model="", model_directory="./", *args,
             **kwargs):
 
@@ -96,6 +97,7 @@ class AbstractAgentBasedModel(object):
         self.gan_method = gan_method
         self.save_model = save_model if save_model in [0,1] else 1
         self.hidden_size = hidden_size
+        self.option = option
         
         if self.noise_dim < 1:
             self.use_noise = False
@@ -219,7 +221,7 @@ class AbstractAgentBasedModel(object):
                 for i, value in enumerate(ffeatures):
                     if value.shape[0] == 0:
                         continue
-                    if i >= len(features):
+                    if idx == 0:
                         features.append(value)
                     else:
                         try:
@@ -235,7 +237,7 @@ class AbstractAgentBasedModel(object):
                 for i, value in enumerate(ftargets):
                     if value.shape[0] == 0:
                         continue
-                    if i >= len(targets):
+                    if idx == 0:
                         targets.append(value)
                     else:
                         try:
@@ -250,10 +252,14 @@ class AbstractAgentBasedModel(object):
                 # --------------------------------------------------------------
 
             n_samples = features[0].shape[0]
+            for f in features:
+                if f.shape[0] != n_samples:
+                    raise ValueError("Feature lengths are not equal!")
+
             #print("COLLECTED", n_samples, "samples")
             idx = np.random.randint(n_samples,size=(self.batch_size,))
             yield ([f[idx] for f in features],
-                    [t[idx] for t in targets])
+                   [t[idx] for t in targets])
 
     def save(self):
         '''

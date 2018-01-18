@@ -324,7 +324,7 @@ class RobotMultiPredictionSampler(RobotMultiHierarchical):
         # Add dense information
         y = AddDense(option, 64, "relu", 0., constraint=None, output=False)
         x = TileOnto(x, y, 64, (8,8))
-        x = AddConv2D(x, 64, [5,5], 1, 0.)
+        x = AddConv2D(x, 64, [5,5], 1, self.dropout_rate)
         #x = AddConv2D(x, 128, [5,5], 2, 0.)
 
         # --- start ssm block
@@ -349,7 +349,7 @@ class RobotMultiPredictionSampler(RobotMultiHierarchical):
         for i in range(1):
             #x = TileOnto(x, y, self.num_options, (8,8))
             x = AddConv2D(x, 64,
-                    [7,7],
+                    [3,3],
                     stride=1,
                     dropout_rate=self.dropout_rate)
 
@@ -962,7 +962,6 @@ class RobotMultiPredictionSampler(RobotMultiHierarchical):
         Take input state and image information projected into a latent space
         and decode them back into their appropriate output representations
         '''
-
 
     def _targetsFromTrainTargets(self, train_targets):
         '''

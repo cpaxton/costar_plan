@@ -27,7 +27,7 @@ Contents:
     - [5.2 PyBullet Sim](docs/pybullet.md): an alternative to Gazebo that may be preferrable in some situations
     - [5.3 costar_bullet quick start](docs/costar_bullet.md): How to run tasks, generate datasets, train models, and extend costar_bullet with your own components.
     - [5.4 Adding a robot to the ROS code](docs/add_a_robot.md): NOT using Bullet sim
-  - [6. Husky robot](husky/Readme.md): Start the APL Husky sim
+  - [6. Husky robot](docs/husky.md): Start the APL Husky sim
   - [7. TOM robot](docs/tom.md): introducing the TOM robot from TUM
     - [7.1 TOM Data](docs/tom_data.md): data necessary for TOM
     - [7.2 The Real TOM](docs/tom_real_robot.md): details about parts of the system for running on the real TOM

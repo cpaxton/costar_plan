@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import rospy
 
 from gazebo_msgs.msg import ModelStates
@@ -48,7 +50,10 @@ fireHydrantPose.orientation.z = 0.8945
 fireHydrantPose.orientation.w = -0.447
 
 
-poseDictionary = {'Dumpster': dumpsterPose, 'Barrier' : barrierPose, 'Barrel' :  constructionBarrelPose, 'Fire Hydrant': fireHydrantPose}
+poseDictionary = {'Dumpster': dumpsterPose,
+        'Barrier' : barrierPose,
+        'Barrel' :  constructionBarrelPose,
+        'Fire Hydrant': fireHydrantPose}
 
 dumpsterPose = None
 barrierPose = None
@@ -73,35 +78,7 @@ def modelsCallback(data):
     global gazeboModels
     
     gazeboModels = data    
-    
-#    dumpster_index = -1
-#    jersey_barrier_index = -1
-#    
-#    global objectList 
-#    objectList = data.name
-#    
-#    for i in range(len(data.name)):
-#        if data.name[i] == "Dumpster_0":
-#            dumpster_index = i
-#        elif data.name[i] == "jersey_barrier_15":
-#            jersey_barrier_index = i
-#        
-#            
-#    if dumpster_index == -1:
-#        print "dumpster not found!"
-#        return
-#    
-#    if jersey_barrier_index == -1:
-#        print "jersey barrier not found!"
-#        return
-#
-#
-#    dumpsterPose = data.pose[dumpster_index]
-#    barrierPose = data.pose[jersey_barrier_index]    
-#    #print "dumpster position ", dumpsterPose.position.x, ", ", dumpsterPose.position.y
-#    #print "barrier position ", barrierPose.position.x, ", ", barrierPose.position.y
-        
-    
+
 
 def listener():
     # setup subscribers

@@ -163,6 +163,11 @@ def GetModelParser():
                               "do not use this parameter.",
                         type=int,
                         default=1)
+    parser.add_argument("--option",
+                        help="Choose an option to learn for the multi-policy hierarchical model",
+                        type=int,
+                        default=None)
+
     return parser
 
 def GetSubmodelOptions():

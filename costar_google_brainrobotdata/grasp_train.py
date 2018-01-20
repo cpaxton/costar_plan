@@ -62,7 +62,7 @@ flags.DEFINE_string('load_weights', 'grasp_model_weights.h5',
                     """Load and continue training the specified file containing model weights.""")
 flags.DEFINE_integer('epochs', 300,
                      """Epochs of training""")
-flags.DEFINE_string('grasp_dataset_eval', '097',
+flags.DEFINE_string('grasp_dataset_eval', '97',
                     """Filter the subset of 1TB Grasp datasets to evaluate.
                     097 by default. It is important to ensure that this selection
                     is completely different from the selected training datasets
@@ -532,6 +532,76 @@ class GraspTrain(object):
                 return None
 
             return weights_name_str
+
+    def get_compiled_model(self, dataset=FLAGS.grasp_dataset_eval,
+                           batch_size=1,
+                           load_weights=FLAGS.load_weights,
+                           make_model_fn=grasp_model.grasp_model_densenet,
+                           imagenet_preprocessing=FLAGS.imagenet_preprocessing,
+                           grasp_sequence_min_time_step=FLAGS.grasp_sequence_min_time_step,
+                           grasp_sequence_max_time_step=FLAGS.grasp_sequence_max_time_step,
+                           resize=FLAGS.resize,
+                           resize_height=FLAGS.resize_height,
+                           resize_width=FLAGS.resize_width,
+                           model_name=FLAGS.grasp_model,
+                           loss=FLAGS.loss,
+                           metric=FLAGS.metric,
+                           fetches=None):
+        with K.name_scope('predict') as scope:
+            data = grasp_dataset.GraspDataset(dataset=dataset)
+            (pregrasp_op_batch, grasp_step_op_batch,
+             simplified_grasp_command_op_batch,
+             grasp_success_op_batch,
+             num_samples) = data.get_training_tensors(batch_size=batch_size,
+                                                      imagenet_preprocessing=imagenet_preprocessing,
+                                                      random_crop=False,
+                                                      image_augmentation=False,
+                                                      resize=resize,
+                                                      grasp_sequence_min_time_step=grasp_sequence_min_time_step,
+                                                      grasp_sequence_max_time_step=grasp_sequence_max_time_step,
+                                                      shift_ratio=0.0)
+
+            if resize:
+                input_image_shape = [resize_height, resize_width, 3]
+            else:
+                input_image_shape = [512, 640, 3]
+
+            ########################################################
+            # End tensor configuration, begin model configuration and training
+
+            # create the model
+            model = make_model_fn(
+                pregrasp_op_batch,
+                grasp_step_op_batch,
+                simplified_grasp_command_op_batch,
+                # input_image_shape=input_image_shape,
+                dropout_rate=0.0)
+
+            if(load_weights):
+                if os.path.isfile(load_weights):
+                    model.load_weights(load_weights)
+                else:
+                    raise ValueError('Could not load weights {}, '
+                                     'the file does not exist.'.format(load_weights))
+
+            loss_name = 'loss'
+            if 'segmentation_single_pixel_binary_crossentropy' in loss:
+                loss = grasp_loss.segmentation_single_pixel_binary_crossentropy
+                loss_name = 'segmentation_single_pixel_binary_crossentropy'
+
+            if isinstance(loss, str) and 'segmentation_gaussian_binary_crossentropy' in loss:
+                loss = grasp_loss.segmentation_gaussian_binary_crossentropy
+                loss_name = 'segmentation_gaussian_binary_crossentropy'
+
+            metrics, monitor_metric_name = self.gather_metrics(metric)
+
+            model.compile(optimizer='sgd',
+                          loss=loss,
+                          metrics=metrics,
+                          target_tensors=[grasp_success_op_batch],
+                          fetches=fetches,
+                          return_fetches=True)
+            return model
 
     def gather_metrics(self, metric):
         metrics = []

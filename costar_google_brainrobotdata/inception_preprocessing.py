@@ -22,6 +22,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+import keras
 
 from tensorflow.python.ops import control_flow_ops
 
@@ -107,6 +108,34 @@ def distort_color(image, color_ordering=0, fast_mode=True, scope=None,
         return tf.clip_by_value(image, 0.0, 1.0)
 
 
+def preprocess_input_0_1(image, mode='tf', data_format=None):
+    """ Assumes images with range [0, 1]
+
+    Shifts the channel value ranges for direct input into a neural network.
+
+      image: A floating point image with range [0, 1]
+      mode: One of "caffe", "tf" or "torch".
+          - caffe: will convert the images from RGB to BGR,
+              then will zero-center each color channel with
+              respect to the ImageNet dataset,
+              without scaling.
+          - tf: will scale pixels between -1 and 1,
+              sample-wise.
+          - torch: will scale pixels between 0 and 1 and then
+              will normalize each channel with respect to the
+              ImageNet dataset.
+    """
+    if mode == 'tf':
+        image = tf.subtract(image, 0.5)
+        image = tf.multiply(image, 2.0)
+    else:
+        # shift back to 0-255
+        image *= 255.0
+        image = keras.applications.imagenet_utils.preprocess_input(
+            image, mode=mode, data_format=data_format)
+    return image
+
+
 def distorted_bounding_box_crop(image,
                                 bbox,
                                 min_object_covered=0.1,
@@ -166,8 +195,13 @@ def distorted_bounding_box_crop(image,
 
 def preprocess_for_train(image,
                          fast_mode=True,
+                         lower=0.75,
+                         upper=1.25,
+                         hue_max_delta=0.1,
+                         brightness_max_delta=16. / 255.,
                          scope=None,
-                         add_image_summaries=True):
+                         add_image_summaries=True,
+                         mode='tf', data_format=None):
     """Distort one image for training a network.
 
     Distorting images provides a useful technique for augmenting the data
@@ -205,19 +239,24 @@ def preprocess_for_train(image,
         # Randomly distort the colors. There are 4 ways to do it.
         image = apply_with_random_selector(
             image,
-            lambda x, ordering: distort_color(x, ordering, fast_mode),
+            lambda x, ordering:
+                distort_color(
+                    image=x, color_ordering=ordering, fast_mode=fast_mode,
+                    scope=scope, lower=lower, upper=upper, hue_max_delta=hue_max_delta,
+                    brightness_max_delta=brightness_max_delta),
             num_cases=4)
 
         if add_image_summaries:
             tf.summary.image('final_distorted_image',
                              tf.expand_dims(image, 0))
-        image = tf.subtract(image, 0.5)
-        image = tf.multiply(image, 2.0)
+
+        image = preprocess_input_0_1(image, mode=mode, data_format=data_format)
         return image
 
 
 def preprocess_for_eval(image, height=None, width=None,
-                        central_fraction=None, scope=None):
+                        central_fraction=None, scope=None,
+                        mode='tf', data_format=None):
     """Prepare one image for evaluation.
 
     If height and width are specified it would output an image with that size by
@@ -235,6 +274,16 @@ def preprocess_for_eval(image, height=None, width=None,
       width: integer
       central_fraction: Optional Float, fraction of the image to crop.
       scope: Optional scope for name_scope.
+      mode: One of "caffe", "tf" or "torch".
+          - caffe: will convert the images from RGB to BGR,
+              then will zero-center each color channel with
+              respect to the ImageNet dataset,
+              without scaling.
+          - tf: will scale pixels between -1 and 1,
+              sample-wise.
+          - torch: will scale pixels between 0 and 1 and then
+              will normalize each channel with respect to the
+              ImageNet dataset.
     Returns:
       3-D float Tensor of prepared image.
     """
@@ -252,8 +301,8 @@ def preprocess_for_eval(image, height=None, width=None,
             image = tf.image.resize_bilinear(image, [height, width],
                                              align_corners=False)
             image = tf.squeeze(image, [0])
-        image = tf.subtract(image, 0.5)
-        image = tf.multiply(image, 2.0)
+
+        image = preprocess_input_0_1(image, mode=mode, data_format=data_format)
         return image
 
 
@@ -261,7 +310,12 @@ def preprocess_image(image, height=None, width=None,
                      is_training=False,
                      bbox=None,
                      fast_mode=True,
-                     add_image_summaries=True):
+                     lower=0.75,
+                     upper=1.25,
+                     hue_max_delta=0.1,
+                     brightness_max_delta=16. / 255.,
+                     add_image_summaries=True,
+                     mode='tf', data_format=None):
     """Pre-process one image for training or evaluation.
 
     Args:
@@ -279,6 +333,16 @@ def preprocess_image(image, height=None, width=None,
         [ymin, xmin, ymax, xmax].
       fast_mode: Optional boolean, if True avoids slower transformations.
       add_image_summaries: Enable image summaries.
+      mode: One of "caffe", "tf" or "torch".
+          - caffe: will convert the images from RGB to BGR,
+              then will zero-center each color channel with
+              respect to the ImageNet dataset,
+              without scaling.
+          - tf: will scale pixels between -1 and 1,
+              sample-wise.
+          - torch: will scale pixels between 0 and 1 and then
+              will normalize each channel with respect to the
+              ImageNet dataset.
 
     Returns:
       3-D float Tensor containing an appropriately scaled image
@@ -288,6 +352,11 @@ def preprocess_image(image, height=None, width=None,
     """
     if is_training:
         return preprocess_for_train(image, fast_mode,
-                                    add_image_summaries=add_image_summaries)
+                                    add_image_summaries=add_image_summaries,
+                                    mode=mode, data_format=data_format,
+                                    lower=lower,
+                                    upper=upper,
+                                    hue_max_delta=hue_max_delta,
+                                    brightness_max_delta=brightness_max_delta)
     else:
-        return preprocess_for_eval(image, height, width)
+        return preprocess_for_eval(image, height, width, mode=mode, data_format=data_format)

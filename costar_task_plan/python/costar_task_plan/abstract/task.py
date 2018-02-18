@@ -161,10 +161,13 @@ class Task(object):
             self.template_connections.append((parent, name, frequency))
 
     def getChildren(self, node):
+        '''
+        Return the children associated with this particular node.
+        '''
         if node in self.children:
             return self.children[node], self.weights[node]
         else:
-            return []
+            return [], []
 
     def getOption(self, node):
         if node in self.nodes:
@@ -283,6 +286,15 @@ class Task(object):
                 inodes[name] = [iname]
             self.nodes[iname] = option
             self.children[iname] = set()
+
+    def clear(self):
+        self.nodes = {}
+        self.children = {}
+        self.weights = {}
+        self.indices = {}
+        self.names = {}
+        self.compiled = False
+        self.generic_names = {}
 
     def makeTree(self, world, max_depth=10):
         '''
@@ -414,12 +426,16 @@ class OptionTemplate(object):
 
         if self.task is None:
             iname = self.name_template % (name, make_str(name_args))
-            try:
-                option = self.constructor(**filled_args)
-                for pc in self.postconditions:
-                    option.addPostCondition(pc)
-            except Exception as e:
-                option = None
+            #try:
+            option = self.constructor(**filled_args)
+            for pc in self.postconditions:
+                option.addPostCondition(pc)
+            #except Exception as e:
+            #    print("Warning: failed to create option %s (instance of %s)" % (iname, name))
+            #    print("args =", arg_dict)
+            #    print("name_args =", name_args)
+            #    print(e)
+            #    option = None
         else:
             option = Task(subtask_name=self.task.name)
             for args in self.task.options:

@@ -11,6 +11,8 @@
 # Neural nets and data
 *.npz
 *.h5f
+*.h5
+*.hdf5
 
 # Careful with these -- we want them to be generated at runtime from the
 # associated xacro file.
@@ -27,3 +29,19 @@
 *.so
 *.ttt
 *.json
+
+# Various record folders
+*/logs/*
+*/logs_cornell/*
+*/logs_google_brain/*
+*.tfrecord*
+*.nbi
+*.nbc
+*.csv
+*.zip
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+

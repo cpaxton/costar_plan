@@ -14,10 +14,10 @@ class H5fDataset(object):
         '''
         Create a folder to hold different archives in
         '''
-        self.name = name 
+        self.name = os.path.expanduser(name)
         try:
-            os.mkdir(name)
-        except OSError:
+            os.mkdir(self.name)
+        except OSError as e:
             pass
 
     def write(self, example, i, r):

@@ -1540,23 +1540,18 @@ class GraspDataset(object):
                                                       tf.constant([resize_height, resize_width],
                                                                   name='resize_height_width'))
             if imagenet_preprocessing:
-                rgb_image_op = tf.image.per_image_standardization(rgb_image_op)
+                # TODO(ahundt) add scaling to augmentation and use that to augment delta depth parameters
+                # TODO(ahundt) possibly subtract imagenet mean if using pretrained weights, also simply divide channels by 255, and  see https://github.com/tensorflow/tensorflow/issues/15722
+                # rgb_image_op = tf.image.per_image_standardization(rgb_image_op)
                 rgb_image_op = inception_preprocessing.preprocess_image(
                     rgb_image_op,
                     is_training=image_augmentation,
-                    fast_mode=False)
+                    fast_mode=False,
+                    mode=mode, data_format=data_format)
             else:
                 rgb_image_op = tf.cast(rgb_image_op, tf.float32)
 
             return rgb_image_op
-
-    @staticmethod
-    def _resize_coordinate(coordinate, input_shape, output_shape):
-        """ Update a coordinate based on the current input shape and a new updated output shape.
-        """
-        proportional_dimension_change = output_shape / input_shape[:2]
-        resized_coordinate = coordinate * proportional_dimension_change
-        return resized_coordinate
 
     @staticmethod
     def to_tensors(feature_op_dicts, features):
@@ -1865,13 +1860,15 @@ class GraspDataset(object):
                     # resize needs to be done based on the correct input and output image size,
                     # not just the pregrasp_image_rgb_op's size.
                     if 'cropped' in feature_key:
-                        coordinate = self._resize_coordinate(feature, img_shape, output_shape)
+                        # After cropping the images are resized, so apply the resize step to the coordinate.
+                        coordinate = rcp.resize_coordinate(feature, img_shape, output_shape)
                         coordinate_name = feature_key.replace(preprocessed_suffix, 'cropped_resized')
                         resized_coordinate_dict[coordinate_name] = coordinate
                         if batch_i == 0:
                             features_complete_list = np.append(features_complete_list, coordinate_name)
                     elif 'image_coordinate/yx_2' in feature_key:
-                        coordinate = self._resize_coordinate(feature, raw_img_shape, output_shape)
+                        # Original images are resized, so apply the resize step to the coordinate.
+                        coordinate = rcp.resize_coordinate(feature, raw_img_shape, output_shape)
                         coordinate_name = feature_key.replace('image_coordinate/yx_2', 'image_coordinate/original_resized/yx_2')
                         resized_coordinate_dict[coordinate_name] = coordinate
                         if batch_i == 0:
@@ -2159,6 +2156,7 @@ class GraspDataset(object):
             seed=None):
         """Get tensors configured for training on grasps from a single dataset.
 
+        # TODO(ahundt) add scaling to augmentation and use that to augment delta depth parameters
          TODO(ahundt) 2017-12-05 update get_training_tensors docstring, now expects 'move_to_grasp/time_ordered/' feature strings.
 
          # Features
@@ -2254,7 +2252,7 @@ class GraspDataset(object):
         with K.name_scope('get_training_tensors') as scope:
             # Get tensors that load the dataset from disk plus features calculated from the raw data, including transforms and point clouds
             (pregrasp_op_batch, grasp_step_op_batch, simplified_grasp_command_op_batch, grasp_success_op_batch, feature_op_dicts,
-                    features_complete_list, time_ordered_feature_name_dict, num_samples) = self.get_training_tensors_and_dictionaries(
+             features_complete_list, time_ordered_feature_name_dict, num_samples) = self.get_training_tensors_and_dictionaries(
                 batch_size=batch_size, random_crop=random_crop, sensor_image_dimensions=sensor_image_dimensions,
                 imagenet_preprocessing=imagenet_preprocessing, image_augmentation=image_augmentation,
                 random_crop_dimensions=random_crop_dimensions, random_crop_offset=random_crop_offset,

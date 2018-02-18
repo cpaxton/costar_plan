@@ -90,7 +90,7 @@ def concat_images_with_tiled_vector_layer(images, vector, image_shape=None, vect
 
     # Params
        images: a list of images to combine, must have equal dimensions
-       vector: the 1D vector to tile onto every pixel
+       vector: the 1D vector to tile onto every pixel.
        image_shape: Tuple with 3 entries defining the shape (batch, height, width)
            images should be expected to have, do not specify the number
            of batches.
@@ -259,7 +259,8 @@ def classifier_block(input_tensor, include_top=True, top='classification',
 
 
 def top_block(x, output_image_shape=None, top='classification', dropout_rate=0.0, include_top=True,
-              classes=1, activation='sigmoid', final_pooling=None, verbose=0):
+              classes=1, activation='sigmoid', final_pooling=None,
+              filters=64, verbose=0):
     """ Perform final convolutions for decision making, then apply the classification block.
 
         The top block adds the final "decision making" layers
@@ -291,12 +292,12 @@ def top_block(x, output_image_shape=None, top='classification', dropout_rate=0.0
         if dropout_rate is not None:
             x = Dropout(dropout_rate)(x)
 
-        x = Dense(64, activation='relu')(x)
+        x = Dense(filters, activation='relu')(x)
 
         if dropout_rate is not None:
             x = Dropout(dropout_rate)(x)
 
-        x = Dense(64, activation='relu')(x)
+        x = Dense(filters, activation='relu')(x)
 
         if dropout_rate is not None:
             x = Dropout(dropout_rate)(x)
@@ -306,12 +307,12 @@ def top_block(x, output_image_shape=None, top='classification', dropout_rate=0.0
         if dropout_rate is not None:
             x = Dropout(dropout_rate)(x)
 
-        x = Conv2D(64, (1, 1), activation='relu', padding='same')(x)
+        x = Conv2D(filters, (1, 1), activation='relu', padding='same')(x)
 
         if dropout_rate is not None:
             x = Dropout(dropout_rate)(x)
 
-        x = Conv2D(64, (1, 1), activation='relu', padding='same')(x)
+        x = Conv2D(filters, (1, 1), activation='relu', padding='same')(x)
 
         if dropout_rate is not None:
             x = Dropout(dropout_rate)(x)
@@ -335,20 +336,20 @@ def top_block(x, output_image_shape=None, top='classification', dropout_rate=0.0
     return x
 
 
-def dilated_late_concat_model(
+def hypertree_model(
         images=None, vectors=None,
         image_shapes=None, vector_shapes=None,
         dropout_rate=None,
-        vector_dense_filters=256,
-        dilation_rate=2,
         activation='sigmoid',
         final_pooling=None,
         include_top=True,
         top='segmentation',
+        top_block_filters=64,
         classes=1,
         output_shape=None,
         create_image_tree_roots_fn=None,
         create_vector_tree_roots_fn=None,
+        create_tree_trunk_fn=None,
         verbose=0):
 
     if images is None and image_shapes is None:
@@ -373,11 +374,13 @@ def dilated_late_concat_model(
     else:
         v = vector_logits
         if len(vector_logits) > 1:
-            v = Concatenate(axis=0)(v)
+            v = Concatenate(axis=-1)(v)
         else:
             [v] = v
-        v = Dense(vector_dense_filters)(v)
         x = concat_images_with_tiled_vector_layer(image_logits, v)
+
+    if create_tree_trunk_fn is not None:
+        x = create_tree_trunk_fn(x)
 
     # The top block adds the final "decision making" layers
     # and the classifier block according to the problem type.
@@ -385,7 +388,7 @@ def dilated_late_concat_model(
     # Conv2D layers for pixel-wise prediction problems.
     x = top_block(x, output_shape, top, dropout_rate,
                   include_top, classes, activation,
-                  final_pooling, verbose)
+                  final_pooling, top_block_filters, verbose)
 
     # Make a list of all inputs into the model
     # Each of these should be a list or the empty list [].
@@ -772,7 +775,6 @@ def grasp_model_levine_2016(
                    name='conv'+str(conv_counter))(x)
         conv_counter += 1
 
-
         if verbose > 0:
             print('pre max pool shape:' + str(K.int_shape(x)))
         if pooling == 'max':
@@ -800,7 +802,7 @@ def grasp_model_levine_2016(
         # Conv2D layers for pixel-wise prediction problems.
         x = top_block(x, input_image_shape, top, dropout_rate,
                       include_top, classes, activation,
-                      final_pooling, verbose)
+                      final_pooling, verbose=verbose)
 
         # make a list of all inputs into the model
         inputs = [clear_view_image_input, current_time_image_input]

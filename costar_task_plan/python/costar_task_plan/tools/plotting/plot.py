@@ -39,29 +39,6 @@ def _eval_policy(world, policy):
     return states, actions
 
 def plotOption(world, policy, plots, rename, rows, cols, fs=[]):
-    """
-    parser = _getParser()
-    args = parser.parse_args()
-
-    if args.device is not None:
-        import tensorflow as tf
-        import keras.backend as K
-
-        with tf.device(str(args.device)):
-            states, actions = _eval(args, world, policy, state_vars, action_vars)
-    else:
-        if args.cpu:
-            import tensorflow as tf
-            import keras.backend as K
-
-            with tf.device('/cpu:0'):
-                config = tf.ConfigProto(
-                    device_count = {'GPU': 0}
-                )
-            sess = tf.Session(config=config)
-            K.set_session(sess)
-    """
-
     states, actions = _eval_policy(world, policy)
     graphStatesAndActions(states, actions, plots, rename, rows, cols, fs)
     

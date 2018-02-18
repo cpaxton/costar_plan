@@ -31,6 +31,20 @@ class FakeScenePublisher(object):
         self.orange3 = (0.68,
                   -0.10,
                   -0.363829042912)
+
+        self.blue1 = (0.641782207489,
+                  -0.224464386702,
+                  -0.363829042912)
+        self.red1 = (0.69,
+                  -0.31,
+                  -0.363829042912)
+        self.green1 = (0.68,
+                  -0.10,
+                  -0.363829042912)
+        self.yellow1 = (0.68,
+                  -0.20,
+                  -0.363829042912)
+
         table_pos = (0.5, 0., 0.863-0.5)
         self.table_pos, self.table_rot = pm.toTf(kdl.Frame(
             kdl.Rotation.RotZ(-np.pi/2.),
@@ -88,6 +102,28 @@ class FakeScenePublisher(object):
                 rospy.Time.now(),
                 "/block_2",
                 "/base_link")
+        # =============================================
+        # For debugging the cubes
+        self.tf_pub.sendTransform(self.red1,
+                (0,0,0,1),
+                rospy.Time.now(), 
+                "/red1",
+                "/torso_link")
+        self.tf_pub.sendTransform(self.green1,
+                (0,0,0,1),
+                rospy.Time.now(), 
+                "/green1",
+                "/torso_link")
+        self.tf_pub.sendTransform(self.blue1,
+                (0,0,0,1),
+                rospy.Time.now(), 
+                "/blue1",
+                "/torso_link")
+        self.tf_pub.sendTransform(self.yellow1,
+                (0,0,0,1),
+                rospy.Time.now(), 
+                "/yellow1",
+                "/torso_link")
 
 if __name__ == '__main__':
 

@@ -55,7 +55,6 @@ class ActionInfo(object):
 
 class TaskParser(object):
 
-
     class Example:
         '''
         Lightweight class to track observed trajectories for one hand or
@@ -103,6 +102,8 @@ class TaskParser(object):
         self.object_classes = set()
         self.objects_by_class = {}
         self.classes_by_object = {}
+        self.object_parent_classes = {}
+        self.parent_action = {}
         self.action_naming_style = action_naming_style
         self.idle_tags = []
         self.unknown_tags = []
@@ -111,6 +112,7 @@ class TaskParser(object):
         self.num_arms = len(self.configs)
         self.unknown_apply_before = unknown_apply_before
         self.min_action_length = min_action_length
+        self._done = "DONE"
 
         # Store alias information for converting unknown activities into
         # others partway through a parse
@@ -119,6 +121,13 @@ class TaskParser(object):
         self.trajectories = {}
         self.trajectory_data = {}
         self.trajectory_features = {}
+
+        self.parent_trajectories = {}
+
+        self.sequence_ends = {}
+
+    def setDoneName(self, done="DONE"):
+        self._done = done
 
     def addAlias(self, old_name, new_name):
         '''
@@ -131,6 +140,7 @@ class TaskParser(object):
         old_name: previous name in dataset that should be removed
         new_name: newer name in dataset
         '''
+        self.alias[old_name] = new_name
 
     def addObjectClass(self, object_class):
         self.object_classes.add(object_class)
@@ -145,6 +155,9 @@ class TaskParser(object):
         self.classes_by_object[obj] = obj_class
 
     def _getActionName(self, action):
+        '''
+        Get a long-form name of a particular action
+        '''
         if action.base_name in self.unknown_tags:
             return None
         elif self.action_naming_style == NAME_STYLE_SAME:
@@ -161,11 +174,55 @@ class TaskParser(object):
                 name += "_to_%s"%(self.classes_by_object[action.object_acted_on])
             return name
 
+    def _getObjectClassParent(self, obj):
+        '''
+        Return the parent class of a particular object if it has one. This is
+        used when computing the "parent" class of a particular action.
+        '''
+        if obj in self.object_parent_classes:
+            return self.object_parent_classes[obj]
+        else:
+            return obj
+
+    def _getParentActionName(self, action):
+        '''
+        Get the name of the "parent" action which shares all its parameters
+        '''
+        if action.base_name in self.unknown_tags:
+            return None
+        elif self.action_naming_style == NAME_STYLE_SAME:
+            return action.base_name
+        elif self.action_naming_style == NAME_STYLE_UNIQUE:
+            if action.arm == ActionInfo.ARM_LEFT:
+                arm = "left"
+            elif action.arm == ActionInfo.ARM_RIGHT:
+                arm = "right"
+            name = action.base_name
+            if action.object_in_hand is not None:
+                name += "_with_%s" % (self._getObjectClassParent(
+                    self.classes_by_object[action.object_in_hand]))
+            if action.object_acted_on is not None:
+                name += "_to_%s" % (self._getObjectClassParent(
+                    self.classes_by_object[action.object_acted_on]))
+            return name
+
     def resetDemonstration(self):
         self.data = []
 
     def addIdle(self, *args):
         self.idle_tags += list(args)
+
+    def addObjectClassParent(self, obj_class, parent_class):
+        '''
+        Used as a way of indicating that multiple objects all belong to the
+        same parent object class. So for example if we see many different
+        cubes, this should be fine.
+        '''
+        if obj_class in self.object_parent_classes:
+            raise RuntimeError('Object class %s already has a'
+                               'parent class' % obj_class)
+        else:
+            self.object_parent_classes[obj_class] = parent_class
 
     def addUnknown(self, *args):
         self.unknown_tags += list(args)
@@ -189,16 +246,24 @@ class TaskParser(object):
         self.transition_counts[key] += 1
 
     def addExample(self, t, objs, actions, seq):
-
         '''
         Call this to parse a single time step. This assumes you have properly
         called resetDemonstration() above.
         '''
+        for i, a in enumerate(actions):
+            if a.base_name is None:
+                raise RuntimeError('unnamed action')
+            if a.name is not None:
+                raise RuntimeError('instance name should not be set')
+            if (a.base_name in self.idle_tags):
+                a.object_acted_on = None
+                a.object_in_gripper = None
+            actions[i] = a
         self.data.append((t, objs, actions, seq))
 
     def process(self):
         '''
-        This
+        This function runs through the whole data set and processes it.
         '''
         prev_t = [None] * self.num_arms
         prev = [None] * self.num_arms
@@ -252,6 +317,12 @@ class TaskParser(object):
             for name, obj in objs.items():
                 self.addObject(obj.name, obj.obj_class)
 
+            if seq not in self.sequence_ends:
+                self.sequence_ends[seq] = [
+                        self._getActionName(a)
+                        for a
+                        in actions]
+
             # In order - all actions specified
             for j, action in enumerate(actions):
 
@@ -261,6 +332,9 @@ class TaskParser(object):
                     obj_class = None
 
                 name = self._getActionName(action)
+                parent_name = self._getParentActionName(action)
+                if name not in self.parent_action:
+                    self.parent_action[name] = parent_name
                 if name is None:
                     # "None" is only acceptable as the root of a tree -- not
                     # anywhere as an action node. Whenever we see it, we are
@@ -277,6 +351,11 @@ class TaskParser(object):
                                 ["time"] + examples[j].obj_classes)
                         self._addTransition(prev_added[j], name)
                         prev_added[j] = name
+
+                        # compute final action
+                        if (self.sequence_ends[seq][j] in self.idle_tags
+                            or name not in self.idle_tags):
+                            self.sequence_ends[seq][j] = name
                     else:
                         print("WARNING: trajectory %s of length %d was too short"%(prev[j],len(examples[j].traj)))
 
@@ -304,6 +383,9 @@ class TaskParser(object):
 
                 prev[j] = name
                 prev_t[j] = t
+        for seq, actions in self.sequence_ends.items():
+            for action in actions:
+                self._addTransition(action, self._done)
 
     def addTrajectory(self, name, traj, data, objs):
         '''
@@ -318,13 +400,48 @@ class TaskParser(object):
         data: dict of object poses relevant to this action
         objs: list of object/feature names for this action
         '''
+        parent_name = self.parent_action[name]
+        skill_name = name
         if not name in self.trajectories:
-            self.trajectories[name] = []
-            self.trajectory_data[name] = []
-            self.trajectory_features[name] = objs
+            self.trajectories[skill_name] = []
+            self.trajectory_data[skill_name] = []
+            self.trajectory_features[skill_name] = objs
 
-        self.trajectories[name].append(traj)
-        self.trajectory_data[name].append(data)
+        self.trajectories[skill_name].append(traj)
+        self.trajectory_data[skill_name].append(data)
+
+    def collectTrajectories(self):
+        trajs = {}
+        data = {}
+        features = {}
+        params = {}
+        print("Collecting trajectories for abstraction training.")
+        for name, traj in self.trajectories.items():
+            parent_name = self.parent_action[name]
+            if parent_name not in features:
+                parent_features = []
+                print(">", name, "has features:", self.trajectory_features[name])
+                for f in self.trajectory_features[name]:
+                    if f in self.object_parent_classes:
+                        pf = self.object_parent_classes[f]
+                        print(f, "-->", pf)
+                        parent_features.append(pf)
+                    else:
+                        parent_features.append(f)
+                print("Parent features:", parent_features)
+                features[parent_name] = parent_features
+
+            # Instantiate the new set up for this model
+            if parent_name not in trajs:
+                trajs[parent_name] = []
+                data[parent_name] = []
+                params[parent_name] = []
+            trajs[parent_name] += traj
+            instance_data = self.trajectory_data[name]
+            num_params = len(instance_data)
+            data[parent_name] += instance_data
+            params[parent_name] += num_params * [(name, self.trajectory_features[name])]
+        return trajs, data, features, params
 
     def _getArgs(self, action_name):
         raise NotImplementedError('Create arguments for graph node')
@@ -339,9 +456,15 @@ class TaskParser(object):
         self.train()
         task = Task()
         for node, parents in self.transitions.items():
-            if not node in self.trajectory_features:
-                continue
-            args = self._getArgs(node)
+            if node == self._done:
+                special_node = True
+            else:
+                generic_node = self.parent_action[node]
+                special_node = False
+            if not special_node:
+                if not node in self.trajectory_features:
+                    continue
+                args = self._getArgs(node)
             counts = [self.transition_counts[(parent,node)] for parent in parents]
             task.add(node, list(parents), args, counts)
         return task

@@ -158,7 +158,7 @@ class AbstractWorld(object):
     predicate_check.setIndex(idx)
     self.predicates.append((predicate, predicate_check))
 
-  def fork(self, action, policies={}):
+  def fork(self, action=None, policies={}):
     '''
     Create an exact copy of the world at its current state. This is useful for
     advancing world state for optimization and things like that without using

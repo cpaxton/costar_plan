@@ -55,6 +55,7 @@
   <build_depend>costar_planning_interface</build_depend>
   <build_depend>costar_robot_msgs</build_depend>
   <build_depend>costar_task_plan</build_depend>
+  <build_depend>cv_bridge</build_depend>
   <build_depend>predicator_msgs</build_depend>
   <build_export_depend>costar_bringup</build_export_depend>
   <build_export_depend>costar_objrec_msgs</build_export_depend>
@@ -69,6 +70,7 @@
   <exec_depend>costar_planning_interface</exec_depend>
   <exec_depend>costar_robot_msgs</exec_depend>
   <exec_depend>costar_task_plan</exec_depend>
+  <exec_depend>cv_bridge</exec_depend>
   <exec_depend>predicator_msgs</exec_depend>
 
 

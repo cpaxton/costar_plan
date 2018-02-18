@@ -4,8 +4,8 @@ import numpy as np
 import PyKDL as kdl
 
 from costar_models import MakeModel
-from costar_task_plan.simulation.world import SimulationRobotAction
 from costar_task_plan.abstract import *
+from costar_task_plan.robotics.core import CostarAction
 
 class NeuralNetworkPlannerAgent(AbstractAgent):
     '''
@@ -135,7 +135,6 @@ class NeuralNetworkPlannerAgent(AbstractAgent):
             else:
                 error = False
             # print q_goal, state.arm, state.arm_v
-            return SimulationRobotAction(
-                    arm_cmd=q_goal,
+            return CostarAction(q=q_goal,
                     gripper_cmd=self.gripper,
                     error=error)

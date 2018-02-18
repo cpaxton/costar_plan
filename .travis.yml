@@ -70,8 +70,20 @@ before_install:
 
 # Create a catkin workspace with the package under integration.
 install:
-  # Run install script
-  - $CI_SOURCE_PATH/setup/setup_indigo.sh
+  # Set up costasr_stack
+  - $CI_SOURCE_PATH/setup/setup_tom.sh
+  - export COSTAR_WS="$HOME/costar_ws"
+  - touch $COSTAR_WS/src/ur_modern_driver/CATKIN_IGNORE
+  - touch $COSTAR_PLAN_DIR/costar_gazebo_plugins/CATKIN_IGNORE
+  - touch $COSTAR_WS/src/robotiq/robotiq_s_model_articulated_gazebo_plugins/CATKIN_IGNORE
+  - touch $COSTAR_WS/src/costar_stack/costar_perception/sp_segmenter/CATKIN_IGNORE
+  - touch $COSTAR_WS/src/costar_stack/costar_predicator/predicator_8020_module/CATKIN_IGNORE
+  - touch $COSTAR_WS/src/ur_modern_driver/CATKIN_IGNORE
+  - touch $CI_SOURCE_PATH/costar_gazebo_plugins/CATKIN_IGNORE
+  - touch $COSTAR_WS/src/robotiq/robotiq_s_model_articulated_gazebo_plugins/CATKIN_IGNORE
+  - touch $COSTAR_WS/src/costar_stack/costar_perception/sp_segmenter/CATKIN_IGNORE
+  - touch $COSTAR_WS/src/costar_stack/costar_predicator/predicator_8020_module/CATKIN_IGNORE
+
   - cd ~/costar_ws/src
   # Add the package under integration to the workspace using a symlink.
   - ln -s $CI_SOURCE_PATH .

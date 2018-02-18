@@ -1,7 +1,7 @@
 
-
 import rospy
 from sensor_msgs.msg import JointState
+import numpy as np
 
 
 class JointStateListener(object):

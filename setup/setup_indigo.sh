@@ -29,12 +29,8 @@ sudo -H pip install -U numpy
 
 # TODO(cpaxton): come up with a better way to install tensorflow here. We want
 # to ensure that everything is configured properly for tests.
-if [ nvidia-smi ]
-then
-  sudo -H pip install tensorflow
-else
-  sudo -H pip install tensorflow
-fi
+# sudo -H pip install tensorflow
+# sudo -H pip install tensorflow-gpu
 
 echo "======================================================"
 echo "ROS"

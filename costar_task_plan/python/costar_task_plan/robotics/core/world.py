@@ -40,7 +40,7 @@ class CostarWorld(AbstractWorld):
     each step.
     '''
 
-    def __init__(self, reward,
+    def __init__(self, reward=NullReward(),
                  namespace='/costar',
                  observe=None,
                  robot_config=None,
@@ -110,7 +110,9 @@ class CostarWorld(AbstractWorld):
             name = robot['name']
 
             if robot['q0'] is not None:
-                s0 = CostarState(self, i, q=robot['q0'], dq=np.zeros_like(robot['q0']))
+                s0 = CostarState(i,
+                        q=robot['q0'],
+                        dq=np.zeros_like(robot['q0']))
             else:
                 s0 = CostarState(self, i, None, None)
             self.addActor(
@@ -196,8 +198,6 @@ class CostarWorld(AbstractWorld):
             while not condition(self, self.actors[actor_id].state, ):
                 # cmd = policy.evaluate(self,
                 pass
-
-        # Done.
 
     # Create the set of dynamics used for this particular option/option
     # distribution.
@@ -341,6 +341,9 @@ class CostarWorld(AbstractWorld):
         else:
             self.object_by_class[obj_class].append(obj_name)
         self.objects_to_track.append(obj_name)
+
+    def hasObject(self, obj):
+        return obj in self.objects_to_track
 
     def getObjects(self, obj_class):
         '''

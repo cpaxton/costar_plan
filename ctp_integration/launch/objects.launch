@@ -1,0 +1,24 @@
+<launch>
+  <arg name="start_semi_static" default="false"/>
+  <arg name="start_camera" default="true"/>
+  <arg name="start_alvar" default="true"/>
+
+  <arg name="use_scene_parsing_pose" default="false" doc="Use the stable pose generated from the scene parsing algorithm"/>
+  <arg name="use_external_segmenter" default="true" doc="Use external point cloud segmentation false for sp_segmenter, true for something else e.g. color_nn_segmenter (k means color segmentation)"/>
+  <arg name="table_frame" default="table_center"/>
+
+  <include if="$(arg use_external_segmenter)" file="$(find color_nn_segmenter)/launch/costar_segmenter.launch">
+    <arg name="load_table" value="true"/>
+    <arg name="load_existing_model" value="true"/>
+    <arg name="model_name" value="rgby_wood_white_bin"/>
+    <arg name="background_labels" value="wood_block,white_bin"/>
+    <arg name="foreground_labels" value="blue_block,green_block,red_block,yellow_block"/>
+    <arg name="kmeans_point_per_model" value="2"/>
+    <arg name="table_tf" value="ar_marker_2"/>
+  </include>
+
+  <include if="$(arg use_external_segmenter)" file="$(find sp_segmenter)/launch/colored_block.launch">
+    <arg name="useObjectPersistence" value="false"/>
+  </include>
+
+</launch>

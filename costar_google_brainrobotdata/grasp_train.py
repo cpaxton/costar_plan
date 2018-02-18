@@ -42,7 +42,7 @@ import keras_workaround
 from callbacks import EvaluateInputTensor
 
 from tqdm import tqdm  # progress bars https://github.com/tqdm/tqdm
-# from keras_tqdm import TQDMCallback  # Keras tqdm progress bars https://github.com/bstriner/keras-tqdm
+from keras_tqdm import TQDMCallback  # Keras tqdm progress bars https://github.com/bstriner/keras-tqdm
 
 try:
     import horovod.keras as hvd
@@ -366,6 +366,8 @@ class GraspTrain(object):
                                                          save_best_only=False, verbose=1, monitor=monitor_metric_name)
             callbacks = callbacks + [checkpoint]
 
+            # progress bar
+            callbacks += [TQDMCallback()]
             # 2017-08-27 Tried NADAM for a while with the settings below, only improved for first 2 epochs.
             # optimizer = keras.optimizers.Nadam(lr=0.004, beta_1=0.825, beta_2=0.99685)
 
@@ -403,7 +405,7 @@ class GraspTrain(object):
             model.summary()
 
             try:
-                model.fit(epochs=epochs, steps_per_epoch=steps_per_epoch, callbacks=callbacks)
+                model.fit(epochs=epochs, steps_per_epoch=steps_per_epoch, callbacks=callbacks, verbose=0)
                 final_weights_name = weights_name + '-final.h5'
                 model.save_weights(final_weights_name)
             except (Exception, KeyboardInterrupt) as e:
@@ -560,12 +562,12 @@ class GraspTrain(object):
                 data = grasp_dataset.GraspDataset(dataset=dataset)
             else:
                 data = dataset
-    
-            (pregrasp_op_batch, grasp_step_op_batch, 
-             simplified_grasp_command_op_batch, 
-             grasp_success_op_batch, feature_op_dicts, 
-             features_complete_list, 
-             time_ordered_feature_name_dict, 
+
+            (pregrasp_op_batch, grasp_step_op_batch,
+             simplified_grasp_command_op_batch,
+             grasp_success_op_batch, feature_op_dicts,
+             features_complete_list,
+             time_ordered_feature_name_dict,
              num_samples) = data.get_training_tensors_and_dictionaries(batch_size=batch_size,
                                                       imagenet_preprocessing=imagenet_preprocessing,
                                                       random_crop=False,
@@ -612,11 +614,11 @@ class GraspTrain(object):
             # see https://github.com/keras-team/keras/pull/9121 for details
             # TODO(ahundt) remove this hack
             model._make_predict_function = keras_workaround._make_predict_function_get_fetches.__get__(model, Model)
-            return (model, pregrasp_op_batch, grasp_step_op_batch, 
-                    simplified_grasp_command_op_batch, 
-                    grasp_success_op_batch, feature_op_dicts, 
-                    features_complete_list, 
-                    time_ordered_feature_name_dict, 
+            return (model, pregrasp_op_batch, grasp_step_op_batch,
+                    simplified_grasp_command_op_batch,
+                    grasp_success_op_batch, feature_op_dicts,
+                    features_complete_list,
+                    time_ordered_feature_name_dict,
                     num_samples)
 
     def gather_metrics(self, metric):

@@ -5,7 +5,7 @@ from costar_task_plan.abstract import AbstractPolicy
 import PyKDL as kdl
 import tf_conversions.posemath as pm
 
-class CostarGripperPolicy(AbstractPolicy):
+class CostarArmMotionPolicy(AbstractPolicy):
 
     def __init__(self, pos, rot, goal=None, cartesian_vel=0.25, angular_vel=0.65):
         self.pos = pos

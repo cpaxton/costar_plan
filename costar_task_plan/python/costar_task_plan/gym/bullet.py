@@ -5,8 +5,6 @@ from gym import utils
 from gym.utils import seeding
 from gym.spaces import Box
 
-from costar_task_plan.simulation import CostarBulletSimulation
-
 import numpy as np
 
 class BulletSimulationEnv(gym.Env, utils.EzPickle):

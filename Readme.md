@@ -31,6 +31,7 @@ Contents:
   - [7. TOM robot](docs/tom.md): introducing the TOM robot from TUM
     - [7.1 TOM Data](docs/tom_data.md): data necessary for TOM
     - [7.2 The Real TOM](docs/tom_real_robot.md): details about parts of the system for running on the real TOM
+  - [8. CoSTAR Robot](docs/costar_real_robot.md): execution with a standard UR5
 
 Package/folder layout:
   - [CoSTAR Simulation](costar_simulation/Readme.md): Gazebo simulation and ROS execution

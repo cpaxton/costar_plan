@@ -512,7 +512,6 @@ class RobotFeatures:
             else:
 
                 # we care about this world object...
-                print(obj,idx)
                 obj_frame = world[obj][idx]
 
                 # ... so get object offset to end effector ...

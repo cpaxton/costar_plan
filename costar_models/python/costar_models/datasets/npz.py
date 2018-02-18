@@ -17,7 +17,7 @@ class NpzDataset(object):
         '''
         Create a folder to hold different archives in
         '''
-        self.name = name 
+        self.name = os.path.expanduser(name)
         try:
             os.mkdir(name)
         except OSError:

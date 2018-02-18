@@ -9,11 +9,11 @@ class MotionOption(AbstractOption):
     This option calls out to the current segmenter and waits until termination.
     '''
 
-    def __init__(self, name="motion", world, goal, pose, pose_tolerance=(1e-4,1e-4)):
+    def __init__(self, world, goal, pose, pose_tolerance=(1e-4,1e-4)):
         '''
         Create a goal-directed motion.
         '''
-        super(MotionOption, self).__init__(name, True)
+        super(MotionOption, self).__init__("motion", True)
         self.goal = goal # move to this particular object if it exists
         if goal is not None:
             # Look up the specific ID of the object in the world

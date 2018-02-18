@@ -96,7 +96,7 @@ class RosTaskParser(TaskParser):
                 goal_object=goal,
                 config=self.configs[0],
                 skill_name=skill_name,
-                feature_model=self.lfd.skill_models[skill_name],
+                feature_model=self.lfd.getSkillModel(skill_name),
                 kinematics=self.lfd.kdl_kin,
                 traj_dist=self.lfd.getParamDistribution(skill_name),
                 policy_type=CartesianDmpPolicy)
@@ -112,12 +112,18 @@ class RosTaskParser(TaskParser):
         Get the robot hand and create all appropiate fields here
         '''
         action_name = msg.activity
+        if action_name is None:
+            raise RuntimeError('unnamed action')
         obj_acted_on = msg.object_acted_on
         obj_in_gripper = msg.object_in_hand
         if (obj_acted_on == HandInfo.NO_OBJECT
+                or len(obj_acted_on) == 0
+                or action_name in self.idle_tags
                 or obj_acted_on in self.ignore):
             obj_acted_on = None
         if (obj_in_gripper == HandInfo.NO_OBJECT
+                or len(obj_in_gripper) == 0
+                or action_name in self.idle_tags
                 or obj_in_gripper in self.ignore):
             obj_in_gripper = None
         pose = self._makePose(msg.pose)
@@ -219,8 +225,14 @@ class RosTaskParser(TaskParser):
         print("-------------------------------")
         for key, traj in self.trajectories.items():
             print("%s:"%key, len(traj), "with", self.trajectory_features[key])
+        trajectories, data, features, params = self.collectTrajectories()
+        print("-------------------------------")
+        print("Number of parent trajectories:")
+        print("-------------------------------")
+        for key, traj in trajectories.items():
+            print("%s:"%key, len(traj), "with", features[key])
         print("===============================")
-        self.lfd.train(self.trajectories, self.trajectory_data, self.trajectory_features)
+        self.lfd.train(trajectories, data, features, params)
 
     def debug(self, world):
         self.lfd.debug(world)

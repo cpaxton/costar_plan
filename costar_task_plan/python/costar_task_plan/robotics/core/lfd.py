@@ -69,12 +69,20 @@ class LfD(object):
         self.skill_instances = {}
         self.skill_features = {}
         self.skill_models = {}
+        self.parent_skills = {}
 
         self.pubs = {}
 
-    def train(self, trajectories, trajectory_data, objs, obj_classes={}):
+    def train(self, trajectories, trajectory_data, objs, instance_params=None):
         '''
         Generate DMPs and GMMs associated with different labeled actions.
+
+        Parameters:
+        -----------
+        trajectories: trajectory data by high level skill
+        trajectory_data: training data (object poses)
+        objs: specific data needed for each skill
+        skill_instances: mid-level class info about objects (red, blue, etc.)
         '''
 
         for name, trajs in trajectories.items():
@@ -85,12 +93,25 @@ class LfD(object):
 
             data = trajectory_data[name]
             features = RobotFeatures(self.config, self.kdl_kin)
-            skill_objs = objs[name]
 
-            self.skill_instances[name] = []
+            if not name in self.skill_instances:
+                self.skill_instances[name] = []
 
             # Each world here is an observation of a particular frame in this scene
-            for traj, world in zip(trajs, data):
+            assert(len(trajs) == len(data))
+            for i, (traj, world) in enumerate(zip(trajs, data)):
+
+                if instance_params is not None:
+                    sub_name, skill_objs = instance_params[name][i]
+                    self.parent_skills[sub_name] = name
+                else:
+                    sub_name = None
+                    skill_objs = objs[name]
+
+                # Add a publisher for the sub-model if one does not exist yet
+                if sub_name is not None and sub_name not in self.pubs:
+                    self.pubs[sub_name] = rospy.Publisher(
+                        join('costar', 'lfd', sub_name), PoseArray, queue_size=1000)
 
                 ts = [t for t, _, _ in traj]
                 dt = np.mean(np.diff(ts))
@@ -110,6 +131,10 @@ class LfD(object):
                 instance.fit(ee_frames=ee, worlds=world)
 
                 self.skill_instances[name].append(instance)
+                if ((not sub_name == name) and (sub_name is not None)):
+                    if sub_name not in self.skill_instances:
+                        self.skill_instances[sub_name] = []
+                    self.skill_instances[sub_name].append(instance)
 
                 if not name in self.skill_features:
                     self.skill_features[name] = f
@@ -147,7 +172,6 @@ class LfD(object):
 
         for name, instances in self.skill_instances.items():
 
-            model = self.skill_models[name]
             goal_type = instances[0].objs[-1]
             goals = world.getObjects(goal_type)
             if goals is None:
@@ -159,6 +183,12 @@ class LfD(object):
                 print(name,"goal is",goal_type,"and chose",goal)
             if goal_pose is None:
                 continue
+            if name in self.parent_skills:
+                parent_name = self.parent_skills[name]
+            else:
+                parent_name = name
+
+            model = self.skill_models[parent_name]
 
             option = DmpOption(
                 policy_type=CartesianDmpPolicy,
@@ -167,7 +197,7 @@ class LfD(object):
                 goal_object=goal,
                 skill_name=name,
                 feature_model=model,
-                traj_dist=self.getParamDistribution(name))
+                traj_dist=self.getParamDistribution(parent_name))
 
             policy, condition = option.makePolicy(world)
             dynamics = SimulatedDynamics()
@@ -274,12 +304,32 @@ class LfD(object):
             model_filename = os.path.join(models_dir, '%s_gmm.yml' % name)
             self.skill_models[name] = yaml_load(model_filename)
 
+    def getSkillModel(self, skill):
+        '''
+        Return the appropriate model for this particular skill.
+        '''
+        skill = self.getParent(skill)
+        return self.skill_models[skill]
+
+    def getParent(self, skill):
+        while skill in self.parent_skills:
+            if skill == self.parent_skills[skill]:
+                break
+            skill = self.parent_skills[skill]
+        return skill
+
     def getParamDistribution(self, skill):
         '''
         Get the mean and covariance associated with our observed expert
         policies. We can then use these together with our expected feature
         counts to optimize to a new environment.
         '''
+
+        # Get the parent skill - this is the highest level skill of the type
+        # in case we have more than one.
+        skill = self.getParent(skill)
+
+        # Aggregate features used when training the parent skill model
         params = []
         for instance in self.skill_instances[skill]:
             params.append(instance.params())
@@ -287,7 +337,16 @@ class LfD(object):
         # get mean and get std dev
         params = np.array(params)
         mu = np.mean(params,axis=0)
-        sigma = np.cov(params.T)
+        
+        if params.T.shape[1] < 2:
+            #raise RuntimeError("Cannot create a distribution from one example!")
+            rospy.logwarn("%s: Cannot create distribution from one example!" % skill)
+            rospy.logwarn("skill =" + str(skill) + " shape =" + str(params.T.shape))
+            size = mu.shape[0]
+            sigma = 1e-6 * np.eye(size)
+        else:
+            sigma = np.cov(params.T)
+
         assert mu.shape[0] == sigma.shape[0]
         return Distribution(mu, sigma)
 

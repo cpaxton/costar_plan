@@ -2,16 +2,44 @@
 
   <arg name="start_semi_static" default="false"/>
   <arg name="start_camera" default="true"/>
+  <arg name="start_alvar" default="true"/>
 
   <arg name="use_scene_parsing_pose" default="false" doc="Use the stable pose generated from the scene parsing algorithm"/>
   <arg name="use_external_segmenter" default="false" doc="Use external point cloud segmentation false for sp_segmenter, true for something else e.g. color_nn_segmenter (k means color segmentation)"/>
   <arg name="use_filtered_marker_tf" default="false" doc="Use filtered ar_marker from instructor_core/launch/shoulder_smooth.launch"/>
+  <arg name="table_frame" default="table_center"/>
 
   <!-- start up the camera -->
   <include if="$(arg start_camera)" file="$(find costar_bringup)/launch/camera.launch">
-    <param name="start_alvar" value="$(arg start_alvar)"/>
-    <param name="table_frame" value="$(arg table_frame)"/>
+    <arg name="start_alvar" value="$(arg start_alvar)"/>
+    <arg name="table_frame" value="$(arg table_frame)"/>
     <arg name="use_filtered_marker_tf" value="$(arg use_filtered_marker_tf)"/>
+    <arg name="fake_table_frame" value="true"/>
+    <!-- Create center of the table to describe left and right -->
+    <arg name="table_center" value="0.422 -0.135 -0.023 0.030 -0.004 -0.157 0.987"/>
   </include>
+
+  <!--
+    roslaunch color_nn_segmenter costar_segmenter.launch
+    load_table:=true
+    load_existing_model:=true
+    model_name:=rgby_wood_white_bin
+    background_labels:=wood_block,white_bin
+    foreground_labels:=blue_block,green_block,red_block,yellow_block
+    kmeans_point_per_model:=2 table_tf:=ar_marker_2
+    -->
+    <include if="$(arg use_external_segmenter)" file="$(find color_nn_segmenter)/launch/costar_segmenter.launch">
+      <arg name="load_table" value="true"/>
+      <arg name="load_existing_model" value="true"/>
+      <arg name="model_name" value="rgby_wood_white_bin"/>
+      <arg name="background_labels" value="wood_block,white_bin"/>
+      <arg name="foreground_labels" value="blue_block,green_block,red_block,yellow_block"/>
+      <arg name="kmeans_point_per_model" value="2"/>
+      <arg name="table_tf" value="ar_marker_2"/>
+    </include>
+
+    <include if="$(arg use_external_segmenter)" file="$(find sp_segmenter)/launch/colored_block.launch">
+      <arg name="useObjectPersistence" value="false"/>
+    </include>
 
 </launch>

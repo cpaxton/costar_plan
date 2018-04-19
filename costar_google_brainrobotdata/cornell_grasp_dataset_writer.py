@@ -162,6 +162,7 @@ from keras import backend as K
 
 import grasp_utilities
 import grasp_visualization
+import grasp_metrics
 
 
 flags.DEFINE_string('data_dir',
@@ -186,7 +187,7 @@ flags.DEFINE_string(
 flags.DEFINE_integer('num_fold', 10, 'number of fold for K-Fold splits, default to 10')
 flags.DEFINE_boolean('grasp_download', False,
                      """Download the grasp_dataset to data_dir if it is not already present.""")
-flags.DEFINE_boolean('plot', True, 'Plot images and grasp bounding box data in matplotlib as it is traversed')
+flags.DEFINE_boolean('plot', False, 'Plot images and grasp bounding box data in matplotlib as it is traversed')
 flags.DEFINE_boolean(
     'showTextBox', False,
     """If plotting is enabled, plot extra text boxes near each grasp box
@@ -196,17 +197,56 @@ flags.DEFINE_boolean('verbose', False, 'Print actual features for each image')
 flags.DEFINE_boolean('write', False, 'Actually write the tfrecord files if True, simply gather stats if False.')
 flags.DEFINE_boolean('shuffle', True, 'shuffle the image order before running')
 flags.DEFINE_boolean(
-    'redundant', True,
+    'redundant', False,
     """Duplicate images for every bounding box so dataset is easier to traverse.
        Please note that this substantially affects the output file size,
        but the dataset parsing code becomes much easier to write.
     """)
+flags.DEFINE_boolean(
+    'padding', False,
+    """0 pad all bounding box lists so the actual tensors loaded have the same length
+       Only applies if redundant is False.
+    """)
+flags.DEFINE_integer(
+    'padded_size', 50,
+    """How many bounding boxes should be in each tensor?
+       Only applies if redundant is False.
+    """
+)
+flags.DEFINE_boolean(
+    'angle_classes', True,
+    """Write out the angle classes as class labels in the tfrecord:
+       'image/object/class/label' and 'image/object/class/text'.
+       See num_angle_classes for details.
+    """
+)
+flags.DEFINE_integer(
+    'num_angle_classes', 20,
+    """Divide theta into a classification problem where the half circle of gripper rotation
+       is split into the number of sections defined by angle_classes.
+       Class 0 will be reserved for failure to grasp/background.
+    """
+)
+flags.DEFINE_boolean(
+    'include_negative_examples', False,
+    """Include negative bounding box examples in the written file.
+       This is for use with angle_classes, num_angle_classes, padded_size, and padding.
+    """
+)
+flags.DEFINE_boolean(
+    'angle_classes_zero_is_background_class', True,
+    """Zero means no grasp is available at this location.
+
+       That will correspond to the label 'no_grasp'.
+    """
+)
 flags.DEFINE_float(
     'evaluate_fraction', 0.2,
     """proportion of dataset to be used separately for evaluation,
        use 0 if you want all files to be in one dataset file,
        which makes sense if you're going to do your splits with the tensorflow Dataset API.
        Only applies when is_fold_splits is False.""")
+flags.DEFINE_integer('seed', 1, 'numpy random seed, allows more repeatable k-fold split generation')
 flags.DEFINE_string('tfrecord_filename_base', 'cornell-grasping-dataset', 'base of the filename used for the dataset tfrecords and csv files')
 flags.DEFINE_string('train_filename', 'cornell-grasping-dataset-train.tfrecord', 'filename used for the training dataset')
 flags.DEFINE_string('evaluate_filename', 'cornell-grasping-dataset-evaluate.tfrecord', 'filename used for the evaluation dataset')
@@ -349,9 +389,90 @@ def read_label_file(path):
                 has_nan = False
 
 
+def wrap_angle(angle, max_angle=np.pi):
+    """ Wrap an angle to [-pi, pi)
+    based on https://stackoverflow.com/a/11126083/99379
+    and https://stackoverflow.com/a/15927914/99379
+    """
+    angle = (angle + max_angle) % (2 * max_angle) - max_angle
+    return angle
+
+
+def gripper_theta_categorical_encoding(angle, num_angle_classes=None, zero_is_background=None):
+    """ Encode a gripper theta to
+    Parallel plates are the same if you rotate by pi,
+    so get 2*theta, wrap from -pi to pi
+
+    # Returns
+
+      Theta, an integer representing the amount of rotation experienced by the parallel plates.
+    """
+    if num_angle_classes is None:
+        num_angle_classes = FLAGS.num_angle_classes
+    if zero_is_background is None:
+        zero_is_background = FLAGS.angle_classes_zero_is_background_class
+    # now angles from 0 to pi are encoded from -pi to pi
+    wrapped_angle = wrap_angle(2 * angle)
+    # now in range is from 0 to 1
+    norm_value = (wrapped_angle + np.pi) / (2 * np.pi)
+    categorical_value = np.floor(norm_value * num_angle_classes)
+    if zero_is_background:
+        # 1 is the lowest possible angle value
+        categorical_value += 1
+    return int(categorical_value)
+
+
+def angle_class_text_name(angle_class, num_angle_classes=None, zero_is_background=None):
+    """ Encode a gripper theta to
+    Parallel plates are the same if you rotate by pi,
+    so get 2*theta, wrap from -pi to pi
+
+    """
+    if num_angle_classes is None:
+        num_angle_classes = FLAGS.num_angle_classes
+    if zero_is_background is None:
+        zero_is_background = FLAGS.angle_classes_zero_is_background_class
+
+    if zero_is_background:
+        if angle_class == 0:
+            return 'no_grasp'
+        angle_class -= 1
+    angle_class_step_size = 180 / num_angle_classes
+    half_angle_class_step = angle_class_step_size / 2
+    current_angle_class_middle_degrees = (angle_class_step_size * angle_class) + half_angle_class_step
+    text_str = str(current_angle_class_middle_degrees) + '+/-' + str(half_angle_class_step) + ' degrees'
+    return text_str
+
+
+def write_angle_class_pbtxt(path=FLAGS.data_dir, tfrecord_filename_base=FLAGS.tfrecord_filename_base,
+                            num_angle_classes=None, zero_is_background=None, write=FLAGS.write):
+    if num_angle_classes is None:
+        num_angle_classes = FLAGS.num_angle_classes
+    if zero_is_background is None:
+        zero_is_background = FLAGS.angle_classes_zero_is_background_class
+
+    result_path = os.path.join(path, tfrecord_filename_base + '-label_map.pbtxt')
+    pbtxt = ''
+    num_classes = num_angle_classes
+    if zero_is_background:
+        num_classes += 1
+    for i in range(num_classes):
+        pbtxt += ('item {\n' + '  id: ' + str(i) + '\n  name: \'' +
+                  angle_class_text_name(
+                      0, num_angle_classes=num_angle_classes,
+                      zero_is_background=zero_is_background) +
+                  '\'\n}\n\n')
+
+    print('\npbtxt defining classes for this run:\n' + result_path + '\n\n')
+    if write:
+        with open(result_path, 'w+') as file_object:
+            file_object.write(pbtxt)
+
+
+
 def k_fold_split(path=FLAGS.data_dir, split_type=FLAGS.split_type, num_fold=FLAGS.num_fold,
                  tfrecord_filename_base=FLAGS.tfrecord_filename_base, do_shuffle=FLAGS.shuffle,
-                 write=FLAGS.write):
+                 write=FLAGS.write, include_negative_examples=FLAGS.include_negative_examples):
     """ K-Fold on dataset.
         path: path to z.txt, a file match images and objects. And *pos/neg.txt, should
         remain in same folder with z.txt.
@@ -392,6 +513,7 @@ def k_fold_split(path=FLAGS.data_dir, split_type=FLAGS.split_type, num_fold=FLAG
     last_object_id = 'first_object'  # anything not '0'
     z_path = os.path.join(path, 'z.txt')
 
+    # TODO(ahundt) add support for object class names, like 'Apple', which are stored in z.txt
     z_txt_array = np.lib.arraysetops.unique(np.genfromtxt(z_path, dtype='str'), axis=0)
     if do_shuffle:
         if split_type == 'imagewise':
@@ -410,7 +532,7 @@ def k_fold_split(path=FLAGS.data_dir, split_type=FLAGS.split_type, num_fold=FLAG
                 [new_z_txt_array.append(line[i:i + 4]) for i in range(0, len(line), 4)]
             z_txt_array = new_z_txt_array
     for line in tqdm(z_txt_array, desc='Loading files and grasps'):
-        image_id, object_id, _, _ = line
+        image_id, object_id, object_name, object_db_location = line
         if image_id == last_image_id:
             continue
         else:
@@ -435,6 +557,9 @@ def k_fold_split(path=FLAGS.data_dir, split_type=FLAGS.split_type, num_fold=FLAG
                 fold_last_image[dst_fold] = image_id
                 unique_image_num_list[dst_fold] += 1
 
+            if not include_negative_examples:
+                # If we aren't including negative examples, use an empty path for path_neg
+                path_neg = ''
             _, neg_pos_num = load_bounding_boxes_from_pos_neg_files(path_pos, path_neg)
             negative_num_list[dst_fold] += neg_pos_num[0]
             positive_num_list[dst_fold] += neg_pos_num[1]
@@ -442,6 +567,8 @@ def k_fold_split(path=FLAGS.data_dir, split_type=FLAGS.split_type, num_fold=FLAG
 
             # Store image_ids for each fold
             fold_image_id_list[dst_fold].append(image_id)
+        else:
+            print('Warning: one of these expected files does not exist: ' + str(path_neg) + ' ' + str(path_pos))
 
     info_lists = [which_splits, num_splits, unique_image_num_list,
                   unique_object_num_list, positive_num_list, negative_num_list,
@@ -562,10 +689,24 @@ def bbox_info(box):
     if print_max_width_height > 0:
         print("current width: " + str(width) + "current height: " + str(height) + " MAX_WIDTH: " + str(MAX_WIDTH) + " MAX_HEIGHT: " + str(MAX_HEIGHT))
 
-    return box_coordinates, center_yx, tan, angle, width, height
+    axis_aligned_xmin = center_x - width/2
+    axis_aligned_xmax = center_x + width/2
+    axis_aligned_ymin = center_y - height/2
+    axis_aligned_ymax = center_y - height/2
+
+    angle_categorical_encoding = gripper_theta_categorical_encoding(angle)
+
+    return (box_coordinates, center_yx, tan, angle, width, height,
+            axis_aligned_xmin, axis_aligned_xmax, axis_aligned_ymin, axis_aligned_ymax, angle_categorical_encoding)
 
 
-def load_bounding_boxes_from_pos_neg_files(path_pos, path_neg):
+def load_bounding_boxes_from_pos_neg_files(
+        path_pos, path_neg, angle_classes_zero_is_background_class=None,
+        angle_classes_as_class_label=None):
+    if angle_classes_zero_is_background_class is None:
+        angle_classes_zero_is_background_class = FLAGS.angle_classes_zero_is_background_class
+    if angle_classes_as_class_label is None:
+        angle_classes_as_class_label = FLAGS.angle_classes
     # list of list [y0_list, x0_list, y1_list, x1_list, ...]
     coordinates_list = [[], [], [], [], [], [], [], []]
     # list of centers
@@ -582,26 +723,48 @@ def load_bounding_boxes_from_pos_neg_files(path_pos, path_neg):
     # list of label success/fail, 1/0
     grasp_success = []
     count_fail_success = [0, 0]
+    # bounding boxes rotated to vertical orientation
+    # for possible use in tensorflow object API
+    axis_aligned_xmin_list = []
+    axis_aligned_xmax_list = []
+    axis_aligned_ymin_list = []
+    axis_aligned_ymax_list = []
+    angle_categorical_encoding_list = []
 
     # coordinates_list: a list containing 8 total lists of floats.
     #     Each list contains specific coordinates for the grasping box
     #     at that index.
     #     [x0, y0, x1, y1, x2, y2, x3, y3]
     for path_label, path in enumerate([path_neg, path_pos]):
-        for box in read_label_file(path):
-            coordinates, center_yx, tan, angle, width, height = bbox_info(box)
-            for coordinate, sublist in zip(coordinates, coordinates_list):
-                sublist.append(coordinate)
-            center_x_list.append(center_yx[1])
-            center_y_list.append(center_yx[0])
-            tan_list.append(tan)
-            angle_list.append(angle)
-            cos_list.append(np.cos(angle))
-            sin_list.append(np.sin(angle))
-            width_list.append(width)
-            height_list.append(height)
-            grasp_success.append(path_label)
-            count_fail_success[path_label] += 1
+        # path_label 0 is grasp failure 1 is grasp success
+        if path:
+            # only load non-empty paths,
+            # but make sure path_label indexing remains the same
+            for box in read_label_file(path):
+                (coordinates, center_yx, tan, angle, width, height,
+                 axis_aligned_xmin, axis_aligned_xmax, axis_aligned_ymin, axis_aligned_ymax,
+                 angle_categorical_encoding) = bbox_info(box)
+                for coordinate, sublist in zip(coordinates, coordinates_list):
+                    sublist.append(coordinate)
+                center_x_list.append(center_yx[1])
+                center_y_list.append(center_yx[0])
+                tan_list.append(tan)
+                angle_list.append(angle)
+                cos_list.append(np.cos(angle))
+                sin_list.append(np.sin(angle))
+                width_list.append(width)
+                height_list.append(height)
+                grasp_success.append(path_label)
+                axis_aligned_xmin_list.append(axis_aligned_xmin)
+                axis_aligned_xmax_list.append(axis_aligned_xmax)
+                axis_aligned_ymin_list.append(axis_aligned_ymin)
+                axis_aligned_ymax_list.append(axis_aligned_ymax)
+                if angle_classes_zero_is_background_class:
+                    # assign the class label of 0 if
+                    # this is a negative grasp example
+                    angle_categorical_encoding *= path_label
+                angle_categorical_encoding_list.append(angle_categorical_encoding)
+                count_fail_success[path_label] += 1
 
     bbox_example_features = []
     for i in range(len(center_x_list)):
@@ -619,6 +782,23 @@ def load_bounding_boxes_from_pos_neg_files(path_pos, path_neg):
         feature['bbox/width'] = width_list[i]
         feature['bbox/height'] = height_list[i]
         feature['bbox/grasp_success'] = grasp_success[i]
+        # axis aligned values defined to be compatible with
+        # https://github.com/tensorflow/models/tree/master/research/object_detection
+        feature['image/object/bbox/xmin'] = axis_aligned_xmin_list[i]
+        feature['image/object/bbox/xmax'] = axis_aligned_xmax_list[i]
+        feature['image/object/bbox/ymin'] = axis_aligned_ymin_list[i]
+        feature['image/object/bbox/ymax'] = axis_aligned_ymax_list[i]
+        # TODO(ahundt) add support for object class names, like 'Apple', which are stored in z.txt
+        if angle_classes_as_class_label:
+            feature['image/object/class/label'] = angle_categorical_encoding_list[i]
+            feature['image/object/class/text'] = angle_class_text_name(angle_categorical_encoding_list[i])
+        else:
+            feature['image/object/class/label'] = grasp_success[i]
+            if grasp_success[i]:
+                feature['image/object/class/text'] = 'grasp_success'
+            else:
+                feature['image/object/class/text'] = 'grasp_failure'
+
         bbox_example_features += [feature]
 
     return (bbox_example_features, count_fail_success)
@@ -850,6 +1030,7 @@ def _create_examples(
 
     # Build an Example proto for an example
     feature = {'image/filename': _bytes_feature(filename),
+               'image/source_id': _bytes_feature(filename), #  for compatibility with tf object_detection API
                'image/encoded': _bytes_feature(image_buffer),
                'image/height': _int64_feature(height),
                'image/width': _int64_feature(width),
@@ -866,6 +1047,14 @@ def _create_examples(
     feature['bbox/width'] = _floats_feature(dict_bbox_lists['bbox/width'])
     feature['bbox/height'] = _floats_feature(dict_bbox_lists['bbox/height'])
     feature['bbox/grasp_success'] = _int64_feature(dict_bbox_lists['bbox/grasp_success'])
+
+    feature['image/object/bbox/xmin'] = _floats_feature(dict_bbox_lists['image/object/bbox/xmin'])
+    feature['image/object/bbox/xmax'] = _floats_feature(dict_bbox_lists['image/object/bbox/xmax'])
+    feature['image/object/bbox/ymin'] = _floats_feature(dict_bbox_lists['image/object/bbox/ymin'])
+    feature['image/object/bbox/ymax'] = _floats_feature(dict_bbox_lists['image/object/bbox/ymax'])
+    feature['image/object/class/label'] = _int64_feature(dict_bbox_lists['image/object/class/label'])
+    feature['image/object/class/text'] = _bytes_feature(dict_bbox_lists['image/object/class/text'])
+    # TODO(ahundt) add image/object/class/text and image/object/class/label, see https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/using_your_own_dataset.md
     example = tf.train.Example(features=tf.train.Features(feature=feature))
     return [example]
 
@@ -906,6 +1095,13 @@ def _create_examples_redundant(
         feature['bbox/width'] = _floats_feature(bbox_dict['bbox/width'])
         feature['bbox/height'] = _floats_feature(bbox_dict['bbox/height'])
         feature['bbox/grasp_success'] = _int64_feature(bbox_dict['bbox/grasp_success'])
+
+        feature['image/object/bbox/xmin'] = _floats_feature(bbox_dict['image/object/bbox/xmin'])
+        feature['image/object/bbox/xmax'] = _floats_feature(bbox_dict['image/object/bbox/xmax'])
+        feature['image/object/bbox/ymin'] = _floats_feature(bbox_dict['image/object/bbox/ymin'])
+        feature['image/object/bbox/ymax'] = _floats_feature(bbox_dict['image/object/bbox/ymax'])
+        feature['image/object/class/label'] = _int64_feature(bbox_dict['image/object/class/label'])
+        feature['image/object/class/text'] = _bytes_feature(bbox_dict['image/object/class/text'])
         examples += [tf.train.Example(features=tf.train.Features(feature=feature))]
 
     return examples
@@ -925,9 +1121,17 @@ def list_of_dicts_to_dict_of_lists(ld):
     return {key: [item[key] for item in ld] for key in ld[0].keys()}
 
 
-def traverse_examples_in_single_image(filename, path_pos, path_neg, image_buffer, height, width, verbose=FLAGS.verbose):
+def traverse_examples_in_single_image(filename, path_pos, path_neg, image_buffer, height, width, verbose=None, redundant=None, plot=None):
     """
+
+    redundant: True if only one grasp box should be defined per image, False otherwise.
     """
+    if verbose is None:
+        verbose = FLAGS.verbose
+    if redundant is None:
+        redundant = FLAGS.redundant
+    if plot is None:
+        plot = FLAGS.plot
     # get the bounding box information as lists of dictionaries storing feature data as floats and ints
     (bbox_example_features, count_fail_success) = load_bounding_boxes_from_pos_neg_files(path_pos, path_neg)
 
@@ -941,7 +1145,7 @@ def traverse_examples_in_single_image(filename, path_pos, path_neg, image_buffer
         print('-----------------------')
 
     # visualize this example
-    if FLAGS.plot:
+    if plot:
         gt_images = ground_truth_images([height, width],
                                         dict_bbox_lists['bbox/cy'],
                                         dict_bbox_lists['bbox/cx'],
@@ -957,7 +1161,7 @@ def traverse_examples_in_single_image(filename, path_pos, path_neg, image_buffer
     image_id = get_image_id_from_filename(filename)
 
     # create the tfrecord example protobufs
-    if FLAGS.redundant:
+    if redundant:
         examples = _create_examples_redundant(filename, image_id, image_buffer, height, width, bbox_example_features)
     else:
         examples = _create_examples(filename, image_id, image_buffer, height, width, dict_bbox_lists)
@@ -1049,12 +1253,27 @@ def main():
     if FLAGS.grasp_download:
         gd.download(dataset=FLAGS.grasp_dataset)
 
+    np.random.seed(FLAGS.seed)
+
     if FLAGS.is_fold_splits:
+        # this is an independent group of settings for k-fold splits
+        filename_base = FLAGS.tfrecord_filename_base
+        if not FLAGS.include_negative_examples:
+            filename_base += '-pos-only'
+        if FLAGS.angle_classes:
+            filename_base += '-angle_class'
+        if FLAGS.angle_classes_zero_is_background_class:
+            filename_base += '-zero_is_background'
+        if FLAGS.angle_classes:
+            write_angle_class_pbtxt(tfrecord_filename_base=filename_base)
+        if FLAGS.redundant:
+            filename_base += '-redundant'
         # k_fold_list is a list of lists of filenames
-        k_fold_list = k_fold_split()
-        k_fold_tfrecord_writer(kFold_list=k_fold_list)
+        k_fold_list = k_fold_split(tfrecord_filename_base=filename_base)
+        k_fold_tfrecord_writer(kFold_list=k_fold_list, tfrecord_filename_base=filename_base)
         return
 
+    # run with the original settings
     # Creating a list with all the image paths
     png_filenames, _, _ = get_cornell_grasping_dataset_filenames()
 

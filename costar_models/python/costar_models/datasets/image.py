@@ -11,6 +11,15 @@ def GetJpeg(img):
     im.save(output, format="JPEG", quality=80)
     return output.getvalue()
 
+def GetPng(img):
+    '''
+    Save a numpy array as a Jpeg, then get it out as a binary blob
+    '''
+    im = Image.fromarray(np.uint8(img))
+    output = io.BytesIO()
+    im.save(output, format="PNG")
+    return output.getvalue()
+
 def JpegToNumpy(jpeg):
     stream = io.BytesIO(jpeg)
     im = Image.open(stream)

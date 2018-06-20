@@ -262,13 +262,22 @@ def transform_and_crop_coordinate(coordinate, transform=None, offset=None, theta
             # but the projection matrix is generated uing x, y coordinates
             # so we swap it from (y,x) to (x,y) here.
             if theta is None:
+                squeeze = False
                 if not tf.contrib.framework.is_tensor(coordinate):
+                    # transform a single coordinate
                     coordinate = tf.transpose(tf.convert_to_tensor(
                         [coordinate[1],
                          coordinate[0],
                          1]
                     ))
+                elif len(coordinate.get_shape().as_list()) > 1:
+                    # transform multiple coordinates
+                    coordinate = tf.stack([coordinate[:, 1],
+                                           coordinate[:, 0],
+                                           tf.ones(tf.shape(coordinate)[0], tf.float32)], axis=-1)
                 else:
+                    # transform a single coordinate
+                    squeeze = True
                     coordinate = tf.stack([tf.reshape(coordinate[1], (1,)),
                                            tf.reshape(coordinate[0], (1,)),
                                            tf.constant([1], tf.float32)], axis=-1)
@@ -279,8 +288,11 @@ def transform_and_crop_coordinate(coordinate, transform=None, offset=None, theta
                 projection_matrix = tf.squeeze(projection_matrix)
                 coordinate = tf.matmul(projection_matrix,
                                        coordinate)
-                coordinate = tf.squeeze(tf.transpose(coordinate))
-                coordinate = tf.stack([coordinate[1], coordinate[0]])
+                coordinate = tf.transpose(coordinate)[:, :2]
+                # TODO(ahundt) verify that order and axis are correct for multiple coordinates
+                coordinate = tf.stack([coordinate[:, 0], coordinate[:, 1]], axis=-1)
+                if squeeze:
+                    coordinate = tf.squeeze(coordinate)
 
                 # Very important: most TF code expects y, x coordinates
                 # but the projection matrix is generated uing x, y coordinates

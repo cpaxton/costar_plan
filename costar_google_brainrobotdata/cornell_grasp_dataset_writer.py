@@ -170,23 +170,30 @@ flags.DEFINE_string('data_dir',
                     """Path to dataset in TFRecord format
                     (aka Example protobufs) and feature csv files.""")
 flags.DEFINE_string('grasp_dataset', 'all', 'TODO(ahundt): integrate with brainrobotdata or allow subsets to be specified')
-flags.DEFINE_boolean('is_fold_splits', True, 'If enabled the dataset will be split into num_fold separate files.')
+flags.DEFINE_boolean('k_fold_splits', True, 'If enabled the dataset will be split into num_fold separate files.')
 flags.DEFINE_string(
-    'split_type', 'objectwise',
+    'split_type', '',
     """
-    Options are 'imagewise' and 'objectwise'.
+    Options are 'imagewise' and 'objectwise' and ''.
     If 'objectwise' each file in the kfold split will
     contain separate objects. If 'imagewise',
     different images may contain the same object while
     still being placed in separate splits.
     Default to false, creating k tfrecord files with an
     objectwise split.
-    This parameter only has effect when is_fold_splits is true.
+    If '' both 'objectwise' and 'imagewise' will run.
+    This parameter only has effect when k_fold_splits is true.
     """)
 flags.DEFINE_integer('num_fold', 10, 'number of fold for K-Fold splits, default to 10')
+flags.DEFINE_integer(
+    'seed', 0,
+    """
+    numpy random number seed, this determines ordering and'
+    which images will be in which k-fold splits'
+    """)
 flags.DEFINE_boolean('grasp_download', False,
                      """Download the grasp_dataset to data_dir if it is not already present.""")
-flags.DEFINE_boolean('plot', True, 'Plot images and grasp bounding box data in matplotlib as it is traversed')
+flags.DEFINE_boolean('plot', False, 'Plot images and grasp bounding box data in matplotlib as it is traversed')
 flags.DEFINE_boolean(
     'showTextBox', False,
     """If plotting is enabled, plot extra text boxes near each grasp box
@@ -196,21 +203,36 @@ flags.DEFINE_boolean('verbose', False, 'Print actual features for each image')
 flags.DEFINE_boolean('write', False, 'Actually write the tfrecord files if True, simply gather stats if False.')
 flags.DEFINE_boolean('shuffle', True, 'shuffle the image order before running')
 flags.DEFINE_boolean(
-    'redundant', True,
+    'redundant_images', False,
     """Duplicate images for every bounding box so dataset is easier to traverse.
        Please note that this substantially affects the output file size,
        but the dataset parsing code becomes much easier to write.
+       The downside of the above is you can't only compare against the nearest
+       grasp label, since there can be multiple successful grasp poses in a single image.
+       If redundant_images is false there will be multiple bounding boxes per image,
+       so you'll need to traverse each grasp label, which vary in number on every image.
+
+       The tfrecord file names will contain the text multigrasp if there are not redundant images
+       and singlegrasp to indicate if there are redundant images.
+    """)
+flags.DEFINE_integer(
+    'bbox_padded_count', 50,
+    """
+    When redundant_images is False, this is the fixed number of entries every example will contain
+    regardless of the number of entries in the original dataset, zero padding all data to have equal length.
+    Must be greater than or equal to the maximum number of labels for any image in the dataset. If this value
+    is 0 or None, no padding will be added and all labels of success, gripper poses, etc will have variable length.
     """)
 flags.DEFINE_float(
     'evaluate_fraction', 0.2,
     """proportion of dataset to be used separately for evaluation,
        use 0 if you want all files to be in one dataset file,
        which makes sense if you're going to do your splits with the tensorflow Dataset API.
-       Only applies when is_fold_splits is False.""")
+       Only applies when k_fold_splits is False.""")
 flags.DEFINE_string('tfrecord_filename_base', 'cornell-grasping-dataset', 'base of the filename used for the dataset tfrecords and csv files')
-flags.DEFINE_string('train_filename', 'cornell-grasping-dataset-train.tfrecord', 'filename used for the training dataset')
-flags.DEFINE_string('evaluate_filename', 'cornell-grasping-dataset-evaluate.tfrecord', 'filename used for the evaluation dataset')
-flags.DEFINE_string('stats_filename', 'cornell-grasping-dataset-stats.md', 'filename used for the dataset statistics file')
+flags.DEFINE_string('train_filename', 'cornell-grasping-dataset-train.tfrecord', 'deprecated filename used for the training dataset')
+flags.DEFINE_string('evaluate_filename', 'cornell-grasping-dataset-evaluate.tfrecord', 'deprecated filename used for the evaluation dataset')
+flags.DEFINE_string('stats_filename', 'cornell-grasping-dataset-stats.md', 'deprecated filename used for the dataset statistics file')
 
 
 FLAGS = flags.FLAGS
@@ -351,7 +373,8 @@ def read_label_file(path):
 
 def k_fold_split(path=FLAGS.data_dir, split_type=FLAGS.split_type, num_fold=FLAGS.num_fold,
                  tfrecord_filename_base=FLAGS.tfrecord_filename_base, do_shuffle=FLAGS.shuffle,
-                 write=FLAGS.write):
+                 write=FLAGS.write, redundant_images=FLAGS.redundant_images, seed=FLAGS.seed,
+                 bbox_padded_count=FLAGS.bbox_padded_count):
     """ K-Fold on dataset.
         path: path to z.txt, a file match images and objects. And *pos/neg.txt, should
         remain in same folder with z.txt.
@@ -376,6 +399,19 @@ def k_fold_split(path=FLAGS.data_dir, split_type=FLAGS.split_type, num_fold=FLAG
 
     fold_image_id_list = [[] for i in range(num_fold)]
 
+    if bbox_padded_count is None:
+        bbox_padded_count = 0
+    bbox_padded_count_list = [bbox_padded_count for i in range(num_fold)]
+
+    # special filenames for the rundant and non-redundant_images versions of the dataset
+    # TODO(ahundt) update reader to account for these filename changes!
+    if 'singlegrasp' not in tfrecord_filename_base and 'multigrasp' not in tfrecord_filename_base:
+        if redundant_images:
+            tfrecord_filename_base += '-singlegrasp'
+        else:
+            tfrecord_filename_base += '-multigrasp'
+
+    # determine the filename for objectwise vs imagewise dataset split
     if split_type == 'imagewise':
         spilt_type_list = ['imagewise'] * num_fold
         result_path = os.path.join(path, tfrecord_filename_base + '-imagewise-k-fold-stat.csv')
@@ -395,6 +431,7 @@ def k_fold_split(path=FLAGS.data_dir, split_type=FLAGS.split_type, num_fold=FLAG
     z_txt_array = np.lib.arraysetops.unique(np.genfromtxt(z_path, dtype='str'), axis=0)
     if do_shuffle:
         if split_type == 'imagewise':
+            np.random.seed(FLAGS.seed)
             np.random.shuffle(z_txt_array)
         elif split_type == 'objectwise':
             z_txt_list = []
@@ -405,7 +442,8 @@ def k_fold_split(path=FLAGS.data_dir, split_type=FLAGS.split_type, num_fold=FLAG
                     z_txt_list.append(list(line))
                 else:
                     z_txt_list[-1].extend(line)
-            shuffle(z_txt_list)
+            np.random.seed(FLAGS.seed)
+            np.random.shuffle(z_txt_list)
             for line in z_txt_list:
                 [new_z_txt_array.append(line[i:i + 4]) for i in range(0, len(line), 4)]
             z_txt_array = new_z_txt_array
@@ -445,9 +483,9 @@ def k_fold_split(path=FLAGS.data_dir, split_type=FLAGS.split_type, num_fold=FLAG
 
     info_lists = [which_splits, num_splits, unique_image_num_list,
                   unique_object_num_list, positive_num_list, negative_num_list,
-                  total_grasp_list, spilt_type_list]
+                  total_grasp_list, spilt_type_list, bbox_padded_count_list]
     head_line = ('which_splits, num_splits, unique_image, unique_object,'
-                 'num_pos, num_neg, num_total_grasp, spilt_type\n')
+                 'num_pos, num_neg, num_total_grasp, spilt_type, bbox_padded_count\n')
 
     csv_string = head_line
     for i in range(num_fold):
@@ -468,7 +506,8 @@ def k_fold_split(path=FLAGS.data_dir, split_type=FLAGS.split_type, num_fold=FLAG
 def k_fold_tfrecord_writer(
         path=FLAGS.data_dir, kFold_list=None,
         split_type=FLAGS.split_type, tfrecord_filename_base=FLAGS.tfrecord_filename_base,
-        write=FLAGS.write):
+        write=FLAGS.write, redundant_images=FLAGS.redundant_images,
+        bbox_padded_count=FLAGS.bbox_padded_count):
     """ Write Tfrecord based on image_id stored in kFold_list.
 
         path: directory of where origin data is stored, not a file path.
@@ -487,17 +526,26 @@ def k_fold_tfrecord_writer(
     if write:
         status = 'Writing dataset '
 
+    # special filenames for the rundant and non-redundant_images versions of the dataset
+    # TODO(ahundt) update reader to account for these filename changes!
+    if 'singlegrasp' not in tfrecord_filename_base and 'multigrasp' not in tfrecord_filename_base:
+        if redundant_images:
+            tfrecord_filename_base += '-singlegrasp'
+        else:
+            tfrecord_filename_base += '-multigrasp'
+
     coder = ImageCoder()
     for i, fold in enumerate(tqdm(kFold_list, desc=status + split_type)):
-        recordPath = path + tfrecord_filename_base + '-' + split_type + '-fold-' + str(i) + '.tfrecord'
-        cur_writer = tf.python_io.TFRecordWriter(recordPath)
+        record_path = path + tfrecord_filename_base + '-' + split_type + '-fold-' + str(i) + '.tfrecord'
+        cur_writer = tf.python_io.TFRecordWriter(record_path)
         for image_id in fold:
             bbox_pos_path = path + image_id[:2] + '/pcd' + image_id + 'cpos.txt'
             bbox_neg_path = path + image_id[:2] + '/pcd' + image_id + 'cneg.txt'
             image_path = path + image_id[:2] + '/pcd' + image_id + 'r.png'
             image_buffer, height, width = _process_image(image_path, coder)
             examples, _, _ = traverse_examples_in_single_image(
-                image_path, bbox_pos_path, bbox_neg_path, image_buffer, height, width)
+                image_path, bbox_pos_path, bbox_neg_path, image_buffer, height, width,
+                bbox_padded_count=bbox_padded_count)
             for example in examples:
                 cur_writer.write(example.SerializeToString())
         cur_writer.close()
@@ -737,51 +785,6 @@ def ground_truth_images(
     return gt_images
 
 
-def visualize_example(img, bbox_example_features, gt_images=None, showTextBox=FLAGS.showTextBox):
-
-    if gt_images is None:
-        gt_images = [None] * len(bbox_example_features)
-    center_x_list = [example['bbox/cx'] for example in bbox_example_features]
-    center_y_list = [example['bbox/cy'] for example in bbox_example_features]
-    grasp_success = [example['bbox/grasp_success'] for example in bbox_example_features]
-    gt_plot_height = len(center_x_list)/2
-    fig, axs = plt.subplots(gt_plot_height + 1, 4, figsize=(15, 15))
-    axs[0, 0].imshow(img, zorder=0)
-    # for i in range(4):
-    #     feature['bbox/y' + str(i)] = _floats_feature(dict_bbox_lists['bbox/y' + str(i)])
-    #     feature['bbox/x' + str(i)] = _floats_feature(dict_bbox_lists['bbox/x' + str(i)])
-    # axs[0, 0].arrow(np.array(center_y_list), np.array(center_x_list),
-    #                 np.array(coordinates_list[0]) - np.array(coordinates_list[2]),
-    #                 np.array(coordinates_list[1]) - np.array(coordinates_list[3]), c=grasp_success)
-    axs[0, 0].scatter(np.array(center_x_list), np.array(center_y_list), zorder=2, c=grasp_success, alpha=0.5, lw=2)
-    axs[0, 1].imshow(img, zorder=0)
-    # axs[1, 0].scatter(data[0], data[1])
-    # axs[2, 0].imshow(gt_image)
-    for i, (gt_image, example) in enumerate(zip(gt_images, bbox_example_features)):
-        grasp_success = example['bbox/grasp_success']
-        cx = example['bbox/cx']
-        cy = example['bbox/cy']
-        x_current, y_current = grasp_visualization.get_grasp_polygon_lines_from_example(example)
-        h = i % gt_plot_height + 1
-        w = int(i / gt_plot_height)
-        z = 0
-        axs[h, w].imshow(img, zorder=z)
-        z += 1
-        if gt_image is not None:
-            axs[h, w].imshow(gt_image, alpha=0.25, zorder=z)
-        z += 1
-        # axs[h, w*2+1].imshow(gt_image, alpha=0.75, zorder=1)
-        theta = example['bbox/theta']
-        z = grasp_visualization.draw_grasp(axs[h, w], grasp_success, (cx, cy), theta, x_current, y_current, z=z, showTextBox=showTextBox)
-        z = grasp_visualization.draw_grasp(axs[0, 0], grasp_success, (cx, cy), theta, x_current, y_current, z=z, showTextBox=showTextBox)
-
-    # axs[1, 1].hist2d(data[0], data[1])
-    plt.draw()
-    plt.pause(0.25)
-
-    plt.show()
-
-
 def _process_bboxes(name):
     '''Create a list with the coordinates of the grasping rectangles. Every
     element is either x or y of a vertex.'''
@@ -833,44 +836,69 @@ def _validate_text(text):
 
 
 def _create_examples(
-        filename, image_id, image_buffer, height, width, dict_bbox_lists):
+        filename, image_id, image_buffer, height, width, dict_bbox_lists, bbox_padded_count=None):
     """
 
-    Create a TFRecord example which stores multiple bounding boxe copies with a single image.
+    Create a TFRecord example which stores multiple bounding box copies with a single image.
     This makes lists of coordinates so that images are never repeated.
 
     # Arguments
 
         dict_bbox_lists: A dictionary containing lists of feature values.
+        bbox_padded_count: Fixed length to zero pad pad all examples to
+            no padding is performed if the padded count is 0 or None.
 
     # Returns
 
       A list of examples
     """
+    label_count = len(dict_bbox_lists['bbox/grasp_success'])
+
+    if not bbox_padded_count:
+        bbox_padded_count = 0
+        padding_amount = 0
+    else:
+        padding_amount = bbox_padded_count - label_count
+        if padding_amount < 0:
+            raise ValueError(
+                'Padding bbox_padded_count: ' + str(bbox_padded_count) +
+                ' is insufficient for number of labels in this entry of the dataset: ' +
+                str(label_count))
 
     # Build an Example proto for an example
     feature = {'image/filename': _bytes_feature(filename),
                'image/encoded': _bytes_feature(image_buffer),
                'image/height': _int64_feature(height),
                'image/width': _int64_feature(width),
-               'image/id': _int64_feature(image_id)}
+               'image/id': _int64_feature(image_id),
+               # real number of data labels in this image
+               'bbox/count': _int64_feature(label_count),
+               # constant length padded number of data labels in this image
+               'bbox/padded_count': _int64_feature(bbox_padded_count),
+               # number of values that are actually just padding
+               'bbox/padding_amount': _int64_feature(padding_amount)}
+
+    float_padding = [float(0.)] * padding_amount
+    int_padding = [int(0)] * padding_amount
+
     for i in range(4):
-        feature['bbox/y' + str(i)] = _floats_feature(dict_bbox_lists['bbox/y' + str(i)])
-        feature['bbox/x' + str(i)] = _floats_feature(dict_bbox_lists['bbox/x' + str(i)])
-    feature['bbox/cy'] = _floats_feature(dict_bbox_lists['bbox/cy'])
-    feature['bbox/cx'] = _floats_feature(dict_bbox_lists['bbox/cx'])
-    feature['bbox/tan'] = _floats_feature(dict_bbox_lists['bbox/tan'])
-    feature['bbox/theta'] = _floats_feature(dict_bbox_lists['bbox/theta'])
-    feature['bbox/sin_theta'] = _floats_feature(dict_bbox_lists['bbox/sin_theta'])
-    feature['bbox/cos_theta'] = _floats_feature(dict_bbox_lists['bbox/cos_theta'])
-    feature['bbox/width'] = _floats_feature(dict_bbox_lists['bbox/width'])
-    feature['bbox/height'] = _floats_feature(dict_bbox_lists['bbox/height'])
-    feature['bbox/grasp_success'] = _int64_feature(dict_bbox_lists['bbox/grasp_success'])
+        feature['bbox/y' + str(i)] = _floats_feature(dict_bbox_lists['bbox/y' + str(i)] + float_padding)
+        feature['bbox/x' + str(i)] = _floats_feature(dict_bbox_lists['bbox/x' + str(i)] + float_padding)
+    feature['bbox/cy'] = _floats_feature(dict_bbox_lists['bbox/cy'] + [float(0)] * padding_amount)
+    feature['bbox/cx'] = _floats_feature(dict_bbox_lists['bbox/cx'] + float_padding)
+    feature['bbox/tan'] = _floats_feature(dict_bbox_lists['bbox/tan'] + float_padding)
+    feature['bbox/theta'] = _floats_feature(dict_bbox_lists['bbox/theta'] + float_padding)
+    feature['bbox/sin_theta'] = _floats_feature(dict_bbox_lists['bbox/sin_theta'] + float_padding)
+    feature['bbox/cos_theta'] = _floats_feature(dict_bbox_lists['bbox/cos_theta'] + float_padding)
+    feature['bbox/width'] = _floats_feature(dict_bbox_lists['bbox/width'] + float_padding)
+    feature['bbox/height'] = _floats_feature(dict_bbox_lists['bbox/height'] + float_padding)
+    feature['bbox/grasp_success'] = _int64_feature(dict_bbox_lists['bbox/grasp_success'] + int_padding)
     example = tf.train.Example(features=tf.train.Features(feature=feature))
+
     return [example]
 
 
-def _create_examples_redundant(
+def _create_examples_redundant_images(
         filename, image_id, image_buffer, height, width, bbox_example_features):
     """
 
@@ -883,8 +911,11 @@ def _create_examples_redundant(
 
     # Arguments
 
-        bbox_example_features: A list of dictionaries, each containing example features
-            in basic numerical format (numpy array, int float).
+        height: the height of images
+        width: the width of images
+        bbox_example_features: A list of dictionaries. Each dictionary maps from string
+            keys to a valu containing example features in basic numerical or text format
+            (numpy array, int float, string).
     """
     examples = []
     for i, bbox_dict in enumerate(bbox_example_features):
@@ -893,7 +924,11 @@ def _create_examples_redundant(
                    'image/encoded': _bytes_feature(image_buffer),
                    'image/height': _int64_feature(height),
                    'image/width': _int64_feature(width),
-                   'image/id': _int64_feature(image_id)}
+                   'image/id': _int64_feature(image_id),
+                   # number of data labels with this image, in this case
+                   # the images are redundant so there is always 1 of each feature per image
+                   'bbox/count': _int64_feature(1)}
+
         for j in range(4):
             feature['bbox/y' + str(j)] = _floats_feature(bbox_dict['bbox/y' + str(j)])
             feature['bbox/x' + str(j)] = _floats_feature(bbox_dict['bbox/x' + str(j)])
@@ -925,7 +960,9 @@ def list_of_dicts_to_dict_of_lists(ld):
     return {key: [item[key] for item in ld] for key in ld[0].keys()}
 
 
-def traverse_examples_in_single_image(filename, path_pos, path_neg, image_buffer, height, width, verbose=FLAGS.verbose):
+def traverse_examples_in_single_image(
+        filename, path_pos, path_neg, image_buffer, height, width,
+        bbox_padded_count=FLAGS.bbox_padded_count, verbose=FLAGS.verbose):
     """
     """
     # get the bounding box information as lists of dictionaries storing feature data as floats and ints
@@ -951,21 +988,26 @@ def traverse_examples_in_single_image(filename, path_pos, path_neg, image_buffer
                                         dict_bbox_lists['bbox/grasp_success'])
         # load the image with matplotlib for display
         img = mpimg.imread(filename)
-        visualize_example(img, bbox_example_features, gt_images)
+        grasp_visualization.visualize_example(img, bbox_example_features, gt_images, showTextBox=FLAGS.showTextBox)
 
     # get the object id from the filename
     image_id = get_image_id_from_filename(filename)
 
     # create the tfrecord example protobufs
-    if FLAGS.redundant:
-        examples = _create_examples_redundant(filename, image_id, image_buffer, height, width, bbox_example_features)
+    if FLAGS.redundant_images:
+        examples = _create_examples_redundant_images(filename, image_id, image_buffer, height, width, bbox_example_features)
     else:
-        examples = _create_examples(filename, image_id, image_buffer, height, width, dict_bbox_lists)
+        examples = _create_examples(filename, image_id, image_buffer, height, width, dict_bbox_lists, bbox_padded_count)
 
     return examples, attempt_count, count_fail_success
 
 
-def traverse_dataset(filenames, eval_fraction=FLAGS.evaluate_fraction, write=FLAGS.write, train_file=None, validation_file=None):
+def traverse_dataset(
+        filenames, eval_fraction=FLAGS.evaluate_fraction,
+        write=FLAGS.write, train_file=None, validation_file=None,
+        bbox_padded_count=FLAGS.bbox_padded_count):
+    """ Deprecated function for walking through the dataset
+    """
     coder = ImageCoder()
     image_count = len(filenames)
     train_image_count = 0
@@ -986,7 +1028,8 @@ def traverse_dataset(filenames, eval_fraction=FLAGS.evaluate_fraction, write=FLA
         bbox_neg_path = filename[:-5]+'cneg.txt'
         image_buffer, height, width = _process_image(filename, coder)
         examples, attempt_count, count_fail_success = traverse_examples_in_single_image(
-            filename, bbox_pos_path, bbox_neg_path, image_buffer, height, width)
+            filename, bbox_pos_path, bbox_neg_path, image_buffer, height, width,
+            bbox_padded_count=bbox_padded_count)
 
         # Split the dataset in 80% for training and 20% for validation
         total_attempt_count += attempt_count
@@ -1016,8 +1059,9 @@ def traverse_dataset(filenames, eval_fraction=FLAGS.evaluate_fraction, write=FLA
             eval_fail_success_count)
 
 
-def get_cornell_grasping_dataset_filenames(data_dir=FLAGS.data_dir, shuffle=FLAGS.shuffle):
-    # Creating a list with all the image paths
+def get_cornell_grasping_dataset_filenames(data_dir=FLAGS.data_dir, shuffle=FLAGS.shuffle, seed=FLAGS.seed):
+    """ Create a list of all image paths from the cornell grasping dataset.
+    """
     folders = range(1, 11)
     folders = ['0'+str(i) if i < 10 else '10' for i in folders]
     png_filenames = []
@@ -1027,6 +1071,7 @@ def get_cornell_grasping_dataset_filenames(data_dir=FLAGS.data_dir, shuffle=FLAG
             png_filenames.append(name)
 
     if shuffle:
+        np.random.seed(FLAGS.seed)
         # Shuffle the list of image paths
         np.random.shuffle(png_filenames)
 
@@ -1049,67 +1094,74 @@ def main():
     if FLAGS.grasp_download:
         gd.download(dataset=FLAGS.grasp_dataset)
 
-    if FLAGS.is_fold_splits:
-        # k_fold_list is a list of lists of filenames
-        k_fold_list = k_fold_split()
-        k_fold_tfrecord_writer(kFold_list=k_fold_list)
-        return
-
-    # Creating a list with all the image paths
-    png_filenames, _, _ = get_cornell_grasping_dataset_filenames()
-
-    train_file = os.path.join(FLAGS.data_dir, FLAGS.train_filename)
-    validation_file = os.path.join(FLAGS.data_dir, FLAGS.evaluate_filename)
-    stats_file = os.path.join(FLAGS.data_dir, FLAGS.stats_filename)
-    print(train_file)
-    print(validation_file)
     if not FLAGS.write:
         print('WARNING: Gathering stats that WILL NOT BE WRITTEN TO A FILE'
               ' training and evaluation stats will not '
               'be valid for any existing tfrecord file.'
               'To write to a file run python build_cgd_dataset.py --write.')
 
-    (image_count, total_attempt_count, train_image_count, eval_image_count,
-     train_attempt_count, eval_attempt_count, train_fail_success_count,
-     eval_fail_success_count) = traverse_dataset(png_filenames, train_file=train_file, validation_file=validation_file)
+    if FLAGS.k_fold_splits:
+        if FLAGS.split_type == '':            # k_fold_list is a list of lists of filenames
+            k_fold_list = k_fold_split(split_type='imagewise')
+            k_fold_tfrecord_writer(kFold_list=k_fold_list, split_type='imagewise')
+            k_fold_list = k_fold_split(split_type='objectwise')
+            k_fold_tfrecord_writer(kFold_list=k_fold_list, split_type='objectwise')
+        else:
+            # k_fold_list is a list of lists of filenames
+            k_fold_list = k_fold_split()
+            k_fold_tfrecord_writer(kFold_list=k_fold_list)
+    else:
+        # this only runs when not generating k-fold splits
+        # Creating a list with all the image paths
+        png_filenames, _, _ = get_cornell_grasping_dataset_filenames()
 
-    total_success_count = train_fail_success_count[1] + eval_fail_success_count[1]
-    total_fail_count = train_fail_success_count[0] + eval_fail_success_count[0]
+        train_file = os.path.join(FLAGS.data_dir, FLAGS.train_filename)
+        validation_file = os.path.join(FLAGS.data_dir, FLAGS.evaluate_filename)
+        stats_file = os.path.join(FLAGS.data_dir, FLAGS.stats_filename)
+        print(train_file)
+        print(validation_file)
 
-    stat_string = ''
+        (image_count, total_attempt_count, train_image_count, eval_image_count,
+         train_attempt_count, eval_attempt_count, train_fail_success_count,
+         eval_fail_success_count) = traverse_dataset(png_filenames, train_file=train_file, validation_file=validation_file)
 
-    stat_string += '\n' + ('Cornell Grasping Dataset')
-    stat_string += '\n' + ('------------------------')
-    stat_string += '\n' + ('')
-    stat_string += '\n' + ('TFRecord generation complete. Saved files:\n\n - %s\n - %s\n - %s' % (train_file, validation_file, stats_file))
-    stat_string += '\n' + ('')
-    stat_string += '\n' + ('Dataset Statistics')
-    stat_string += '\n' + ('---------------')
-    stat_string += '\n' + ('')
-    stat_string += '\n' + ('### Totals')
-    stat_string += '\n' + (' - %s images' % image_count)
-    stat_string += '\n' + (' - %s grasp attempts' % total_attempt_count)
-    stat_string += '\n' + get_stat('successful grasps', total_success_count, total_attempt_count)
-    stat_string += '\n' + get_stat('failed grasps', total_fail_count, total_attempt_count)
-    stat_string += '\n' + ('')
-    stat_string += '\n' + ('### Training Data')
-    stat_string += '\n' + get_stat('images', train_image_count, image_count)
-    stat_string += '\n' + get_stat('grasp attempts', train_attempt_count, total_attempt_count, ' of total')
-    stat_string += '\n' + get_stat('successful grasps', train_fail_success_count[1], train_attempt_count, ' of training data')
-    stat_string += '\n' + get_stat('failed grasps', train_fail_success_count[0], train_attempt_count, ' of training data')
-    stat_string += '\n' + ('')
-    stat_string += '\n' + ('### Evaluation Data')
-    stat_string += '\n' + get_stat('images', eval_image_count, image_count)
-    stat_string += '\n' + get_stat('grasp attempts', eval_attempt_count, total_attempt_count, ' of toal')
-    stat_string += '\n' + get_stat('successful grasps', eval_fail_success_count[1], eval_attempt_count, ' of eval data')
-    stat_string += '\n' + get_stat('failed grasps', eval_fail_success_count[0], eval_attempt_count, ' of eval data')
-    stat_string += '\n' + ('')
+        total_success_count = train_fail_success_count[1] + eval_fail_success_count[1]
+        total_fail_count = train_fail_success_count[0] + eval_fail_success_count[0]
 
-    if FLAGS.write:
-        with open(FLAGS.stats_filename, "w") as text_file:
-            text_file.write(stat_string)
+        stat_string = ''
 
-    print(stat_string)
+        stat_string += '\n' + ('Cornell Grasping Dataset')
+        stat_string += '\n' + ('------------------------')
+        stat_string += '\n' + ('')
+        stat_string += '\n' + ('TFRecord generation complete. Saved files:\n\n - %s\n - %s\n - %s' % (train_file, validation_file, stats_file))
+        stat_string += '\n' + ('')
+        stat_string += '\n' + ('Dataset Statistics')
+        stat_string += '\n' + ('---------------')
+        stat_string += '\n' + ('')
+        stat_string += '\n' + ('### Totals')
+        stat_string += '\n' + (' - %s images' % image_count)
+        stat_string += '\n' + (' - %s grasp attempts' % total_attempt_count)
+        stat_string += '\n' + get_stat('successful grasps', total_success_count, total_attempt_count)
+        stat_string += '\n' + get_stat('failed grasps', total_fail_count, total_attempt_count)
+        stat_string += '\n' + ('')
+        stat_string += '\n' + ('### Training Data')
+        stat_string += '\n' + get_stat('images', train_image_count, image_count)
+        stat_string += '\n' + get_stat('grasp attempts', train_attempt_count, total_attempt_count, ' of total')
+        stat_string += '\n' + get_stat('successful grasps', train_fail_success_count[1], train_attempt_count, ' of training data')
+        stat_string += '\n' + get_stat('failed grasps', train_fail_success_count[0], train_attempt_count, ' of training data')
+        stat_string += '\n' + ('')
+        stat_string += '\n' + ('### Evaluation Data')
+        stat_string += '\n' + get_stat('images', eval_image_count, image_count)
+        stat_string += '\n' + get_stat('grasp attempts', eval_attempt_count, total_attempt_count, ' of toal')
+        stat_string += '\n' + get_stat('successful grasps', eval_fail_success_count[1], eval_attempt_count, ' of eval data')
+        stat_string += '\n' + get_stat('failed grasps', eval_fail_success_count[0], eval_attempt_count, ' of eval data')
+        stat_string += '\n' + ('')
+
+        if FLAGS.write:
+            with open(FLAGS.stats_filename, "w") as text_file:
+                text_file.write(stat_string)
+
+        print(stat_string)
 
 if __name__ == '__main__':
     main()

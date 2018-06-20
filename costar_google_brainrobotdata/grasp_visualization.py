@@ -165,15 +165,14 @@ def draw_grasp_prediction_matplotlib(axs, prediction, image, grasp_success, z, s
     return z
 
 
-def visualize_redundant_example(
+def visualize_redundant_images_example(
         features_dicts, predictions=None, predictions_grasp_success=True, showTextBox=None, figcols=2,
-        show=True, blocking=False, save_filename=None, close=True, verbose=0):
+        show=True, blocking=False, save_filename=None, close=True, verbose=1):
     """ Visualize numpy dictionary containing a grasp example.
     """
     # if showTextBox is None:
     #     showTextBox = FLAGS.showTextBox
 
-    # TODO(ahundt) don't duplicate this in cornell_grasp_dataset_writer
     if not isinstance(features_dicts, list):
         features_dicts = [features_dicts]
 
@@ -274,8 +273,8 @@ def visualize_redundant_example(
         z = draw_grasp(
             axs=axs[h, w],
             grasp_success=grasp_success,
-            center=(example['bbox/cx'], example['bbox/cy']),
-            theta=example['bbox/theta'],
+            center=(float(example['bbox/cx']), float(example['bbox/cy'])),
+            theta=float(example['bbox/theta']),
             z=z,
             showTextBox=showTextBox)
 
@@ -311,7 +310,136 @@ def visualize_redundant_example(
     # axs[1, 1].hist2d(data[0], data[1])
 
 
+def visualize_example(
+        img, bbox_example_features, gt_images=None, showTextBox=False,
+        show=True, blocking=True, save_filename=None, close=True,
+        figsize=(15, 15)):
+    """ Visualize an example from the dataset with multiple grasp labels.
+
+    # Arguments
+        image: the rgb image associated with this example.
+        bbox_example_features: A list of dictionaries. Each dictionary maps from string
+            keys to a value containing example features in basic numerical or text format
+            (numpy array, int float, string), with data about the grasp location,
+            success status, etc.
+        gt_images: optional list one image for each bbox_example_features list item
+            containing a pixel-wise ground truth status.
+        showTextBox: Should a text box be displayed showing the orientation and pos/neg label.
+            This is useful to make sure orientation and rotation math is correct, but sometimes
+            gets in the way so it can be enabled and disabled.
+    """
+    if gt_images is None:
+        gt_images = [None] * len(bbox_example_features)
+
+    if isinstance(bbox_example_features, dict):
+        example_format = 'dict_of_lists'
+        bbox_example_features = [bbox_example_features]
+    else:
+        example_format = 'list_of_dicts'
+
+    center_x_list = []
+    center_y_list = []
+    grasp_success = []
+
+    gt_plot_height = None
+    bbox_count = None
+    for example in bbox_example_features:
+        center_x_list += [example['bbox/cx']]
+        center_y_list += [example['bbox/cy']]
+        grasp_success += [example['bbox/grasp_success']]
+        if 'bbox/count' in example:
+            bbox_count = example['bbox/count'][0]
+            gt_plot_height = bbox_count / 2
+
+    if gt_plot_height is None:
+        # The data is stored a list of dictionaries containing single data values
+        gt_plot_height = len(center_x_list)/2
+    else:
+        # The data is stored as lists or arrays in a single dictionary
+        # Remove padded values from the lists
+        center_x_list = np.squeeze(center_x_list)
+        center_y_list = np.squeeze(center_x_list)
+        grasp_success = np.squeeze(grasp_success)
+        center_x_list = center_x_list[:bbox_count]
+        center_y_list = center_x_list[:bbox_count]
+        grasp_success = grasp_success[:bbox_count]
+
+    fig, axs = plt.subplots(gt_plot_height + 1, 4, figsize=figsize)
+    axs[0, 0].imshow(img, zorder=0)
+    # for i in range(4):
+    #     feature['bbox/y' + str(i)] = _floats_feature(dict_bbox_lists['bbox/y' + str(i)])
+    #     feature['bbox/x' + str(i)] = _floats_feature(dict_bbox_lists['bbox/x' + str(i)])
+    # axs[0, 0].arrow(np.array(center_y_list), np.array(center_x_list),
+    #                 np.array(coordinates_list[0]) - np.array(coordinates_list[2]),
+    #                 np.array(coordinates_list[1]) - np.array(coordinates_list[3]), c=grasp_success)
+    axs[0, 0].scatter(np.array(center_x_list), np.array(center_y_list), zorder=2, c=grasp_success, alpha=0.5, lw=2)
+    axs[0, 1].imshow(img, zorder=0)
+    # axs[1, 0].scatter(data[0], data[1])
+    # axs[2, 0].imshow(gt_image)
+    if example_format == 'list_of_dicts':
+        # The data is stored a list of dictionaries containing single data values
+        for i, (gt_image, example) in enumerate(zip(gt_images, bbox_example_features)):
+            grasp_success = example['bbox/grasp_success']
+            cx = example['bbox/cx']
+            cy = example['bbox/cy']
+            x_current, y_current = get_grasp_polygon_lines_from_example(example)
+            h = i % gt_plot_height + 1
+            w = int(i / gt_plot_height)
+            z = 0
+            axs[h, w].imshow(img, zorder=z)
+            z += 1
+            if gt_image is not None:
+                axs[h, w].imshow(gt_image, alpha=0.25, zorder=z)
+            z += 1
+            # axs[h, w*2+1].imshow(gt_image, alpha=0.75, zorder=1)
+            theta = example['bbox/theta']
+            z = draw_grasp(axs[h, w], grasp_success, (cx, cy), theta, x_current, y_current, z=z, showTextBox=showTextBox)
+            z = draw_grasp(axs[0, 0], grasp_success, (cx, cy), theta, x_current, y_current, z=z, showTextBox=showTextBox)
+    else:
+        # The data is stored as lists or arrays in a single dictionary
+        for k, (gt_image, example) in enumerate(zip(gt_images, bbox_example_features)):
+            print('example[bbox/grasp_success]: ' + str(example['bbox/grasp_success']))
+            # assume bbox/count is present
+            for i in range(example['bbox/count']):
+                grasp_success = np.squeeze(example['bbox/grasp_success'])[i]
+                cx = np.squeeze(example['bbox/cx'])[i]
+                cy = np.squeeze(example['bbox/cy'])[i]
+
+                num_bboxes = 4
+                x_current = [[] for k in range(num_bboxes)]
+                y_current = [[] for k in range(num_bboxes)]
+                for j in range(num_bboxes):
+                    x_current[j] += [np.squeeze(example['bbox/x'+str(j)])[i], np.squeeze(example['bbox/x'+str((j+1) % 4)])[i]]
+                    y_current[j] += [np.squeeze(example['bbox/y'+str(j)])[i], np.squeeze(example['bbox/y'+str((j+1) % 4)])[i]]
+                # x_current, y_current = get_grasp_polygon_lines_from_example(example)
+                h = i % gt_plot_height + 1
+                w = int(i / gt_plot_height)
+                z = 0
+                axs[h, w].imshow(img, zorder=z)
+                z += 1
+                if gt_image is not None:
+                    axs[h, w].imshow(gt_image, alpha=0.25, zorder=z)
+                z += 1
+                # axs[h, w*2+1].imshow(gt_image, alpha=0.75, zorder=1)
+                theta = np.squeeze(example['bbox/theta'])[i]
+                z = draw_grasp(axs[h, w], grasp_success, (cx, cy), theta, x_current, y_current, z=z, showTextBox=showTextBox)
+                z = draw_grasp(axs[0, 0], grasp_success, (cx, cy), theta, x_current, y_current, z=z, showTextBox=showTextBox)
+
+    plt.tight_layout()
+    if save_filename:
+        plt.savefig(save_filename)
+    if show:
+        plt.draw()
+        plt.pause(0.001)
+        if blocking:
+            plt.show()
+    if close:
+        plt.close()
+
+
 def plot_coordinate(i, gt_plot_height):
+    """ Determine the subplot height, width coordinate to use in a figure.
+    """
     h = i % gt_plot_height + 1
     w = int(i / gt_plot_height)
     return h, w

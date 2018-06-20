@@ -150,7 +150,6 @@ flags.DEFINE_string('pipeline_stage', 'train_test',
 flags.DEFINE_string(
     'split_dataset', 'objectwise',
     """Options are imagewise and objectwise, this is the type of split chosen when the tfrecords were generated.""")
-flags.DEFINE_string('tfrecord_filename_base', 'cornell-grasping-dataset', 'base of the filename used for the dataset tfrecords and csv files')
 flags.DEFINE_string(
     'feature_combo', 'image_preprocessed_norm_sin2_cos2_width_3',
     """

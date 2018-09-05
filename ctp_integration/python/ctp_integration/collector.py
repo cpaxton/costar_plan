@@ -62,7 +62,7 @@ class DataCollector(object):
             data_type="h5f",
             rate=10,
             data_root=".",
-            img_shape=(128,128),
+            img_shape=(128, 128),
             camera_frame="camera_link",
             tf_buffer=None,
             tf_listener=None,
@@ -79,7 +79,6 @@ class DataCollector(object):
         verbose: print lots of extra info, useful for debuggging
         synchronize: will attempt to synchronize image data by timestamp. Not yet working as of 2018-05-05.
         """
-
 
         self.js_topic = "joint_states"
         # http://wiki.ros.org/depth_image_proc
@@ -213,7 +212,9 @@ class DataCollector(object):
                 rospy.loginfo('rgb color cv_image shape: ' + str(cv_image.shape) + ' depth sequence number: ' + str(msg.header.seq))
                 # print('rgb color cv_image shape: ' + str(cv_image.shape))
                 cv_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
-                rgb_img = cv2.imencode('.jpg', cv_image)[1].tobytes()
+                # encode the jpeg with high quality
+                encode_params = [cv2.IMWRITE_JPEG_QUALITY, 99]
+                rgb_img = cv2.imencode('.jpg', cv_image, encode_params)[1].tobytes()
                 # rgb_img = GetJpeg(np.asarray(cv_image))
 
                 cv_depth_image = self._bridge.imgmsg_to_cv2(depth_msg, desired_encoding="passthrough")
@@ -473,7 +474,7 @@ class DataCollector(object):
 
         switched = False
         if not self.action == action_label:
-            if not self.action is None:
+            if self.action is not None:
                 switched = True
             self.prev_action = self.action
             self.action = action_label
@@ -615,20 +616,23 @@ class DataCollector(object):
 
                 have_data = True
             except (tf2.LookupException, tf2.ExtrapolationException, tf2.ConnectivityException) as e:
-                rospy.logwarn_throttle(10.0, 'Collector transform lookup Failed: %s to %s, %s, %s'
-                                       ' at image time: %s and local time: %s '
-                                       '\nNote: This message may print >1000x less often than the problem occurs.' %
-                                       (self.base_link, self.camera_frame, self.ee_frame,
-                                       str(self.object), str(t), str(latest_available_time_lookup)))
+                rospy.logwarn_throttle(
+                    10.0,
+                    'Collector transform lookup Failed: %s to %s, %s, %s'
+                    ' at image time: %s and local time: %s '
+                    '\nNote: This message may print >1000x less often than the problem occurs.' %
+                    (self.base_link, self.camera_frame, self.ee_frame,
+                     str(self.object), str(t), str(latest_available_time_lookup)))
 
                 have_data = False
                 attempts += 1
                 # rospy.sleep(0.0)
                 if attempts > max_attempts - backup_timestamp_attempts:
-                    rospy.logwarn_throttle(10.0,
-                                          'Collector failed to use the rgb image rosmsg timestamp, '
-                                          'trying latest available time as backup. '
-                                          'Note: This message may print >1000x less often than the problem occurs.')
+                    rospy.logwarn_throttle(
+                        10.0,
+                        'Collector failed to use the rgb image rosmsg timestamp, '
+                        'trying latest available time as backup. '
+                        'Note: This message may print >1000x less often than the problem occurs.')
                     # try the backup timestamp even though it will be less accurate
                     t = latest_available_time_lookup
                 if attempts > max_attempts:

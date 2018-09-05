@@ -204,6 +204,101 @@ def get_past_goal_indices(current_robot_time_index, goal_indices, filename='', v
     return image_indices
 
 
+def encode_label(label_features_to_extract, y, action_successes=None, random_augmentation=None):
+    """ Encode a label based on the features that need to be extracted from the pose y.
+
+    y: list of poses in [[x, y, z, qx, qy, qz, qw]] format
+    action_successes: list of labels with successful actions
+    """
+    # determine the label
+    if label_features_to_extract is None or 'grasp_goal_xyz_3' in label_features_to_extract:
+        # regression to translation case, see semantic_translation_regression in cornell_grasp_train.py
+        y = grasp_metrics.batch_encode_xyz_qxyzw_to_xyz_aaxyz_nsc(y, random_augmentation=random_augmentation)
+        y = y[:, :3]
+    elif label_features_to_extract is None or 'grasp_goal_aaxyz_nsc_5' in label_features_to_extract:
+        # regression to rotation case, see semantic_rotation_regression in cornell_grasp_train.py
+        y = grasp_metrics.batch_encode_xyz_qxyzw_to_xyz_aaxyz_nsc(y, random_augmentation=random_augmentation)
+        y = y[:, 3:]
+    elif label_features_to_extract is None or 'grasp_goal_xyz_aaxyz_nsc_8' in label_features_to_extract:
+        # default, regression label case
+        y = grasp_metrics.batch_encode_xyz_qxyzw_to_xyz_aaxyz_nsc(y, random_augmentation=random_augmentation)
+    elif 'grasp_success' in label_features_to_extract or 'action_success' in label_features_to_extract:
+        if action_successes is None:
+            raise ValueError(
+                    'encode_label() was not provided with action_successes, '
+                    'which should contain data about the future outcome of the action.')
+        # classification label case
+        y = action_successes
+    else:
+        raise ValueError('Unsupported label_features_to_extract: ' + str(label_features_to_extract))
+    return y
+
+
+def encode_action_and_images(
+        data_features_to_extract,
+        poses,
+        action_labels,
+        init_images,
+        current_images,
+        y=None,
+        random_augmentation=None):
+    """ Given an action and images, return the combined input object performing prediction with keras.
+
+    data_features_to_extract: A string identifier for the encoding to use for the actions and images.
+        Options include: 'image_0_image_n_vec_xyz_aaxyz_nsc_15', 'image_0_image_n_vec_xyz_10',
+            'current_xyz_aaxyz_nsc_8', 'current_xyz_3', 'proposed_goal_xyz_aaxyz_nsc_8'.
+    action_labels: batch of already one-hot or floating point encoded action label
+    init_images: batch of clear view images, the initial in the time series.
+        These should already be the appropriate size and rgb values in the range [0, 255].
+    current_images: batch of current image in the time series.
+        These should already be the appropriate size and rgb values in the range [0, 255].
+    y: labels, particularly useful when classifying the quality of a regressed action.
+    random_augmentation: None has no effect, if given a float from 0 to 1
+        it will modify the poses with a small amount of translation and rotation
+        with the probablity specified by the provided floating point number.
+    """
+
+    action_labels = np.array(action_labels)
+    init_images = keras_applications.imagenet_utils._preprocess_numpy_input(
+        np.array(init_images, dtype=np.float32),
+        data_format='channels_last', mode='tf')
+    current_images = keras_applications.imagenet_utils._preprocess_numpy_input(
+        np.array(current_images, dtype=np.float32),
+        data_format='channels_last', mode='tf')
+    poses = np.array(poses)
+
+    # print('poses shape: ' + str(poses.shape))
+    encoded_poses = grasp_metrics.batch_encode_xyz_qxyzw_to_xyz_aaxyz_nsc(
+        poses, random_augmentation=random_augmentation)
+
+    epsilon = 1e-3
+    if np.any(encoded_poses < 0 - epsilon) or np.any(encoded_poses > 1 + epsilon):
+        raise ValueError('An encoded pose was outside the [0,1] range! Update your encoding. poses: ' +
+                         str(poses) + ' encoded poses: ' + str(encoded_poses))
+    if (data_features_to_extract is None or
+            'current_xyz_3' in data_features_to_extract or
+            'image_0_image_n_vec_xyz_10' in data_features_to_extract):
+        # regression input case for translation only
+        action_poses_vec = np.concatenate([encoded_poses[:, :3], action_labels], axis=-1)
+        X = [init_images, current_images, action_poses_vec]
+    elif (data_features_to_extract is None or
+            'current_xyz_aaxyz_nsc_8' in data_features_to_extract or
+            'image_0_image_n_vec_xyz_aaxyz_nsc_15' in data_features_to_extract):
+        # default, regression input case for translation and rotation
+        action_poses_vec = np.concatenate([encoded_poses, action_labels], axis=-1)
+        X = [init_images, current_images, action_poses_vec]
+    elif 'proposed_goal_xyz_aaxyz_nsc_8' in data_features_to_extract:
+        # classification input case
+        proposed_and_current_action_vec = np.concatenate([encoded_poses, action_labels, y], axis=-1)
+        X = [init_images, current_images, proposed_and_current_action_vec]
+    else:
+        raise ValueError('Unsupported data input: ' + str(data_features_to_extract))
+    if (data_features_to_extract is not None and 'image_0_image_n_vec_xyz_aaxyz_nsc_15' in data_features_to_extract):
+        # make the giant data cube if it is requested
+        X = concat_images_with_tiled_vector_np(X[:2], X[2:])
+    return X
+
+
 class CostarBlockStackingSequence(Sequence):
     '''Generates a batch of data from the stacking dataset.
 
@@ -541,10 +636,12 @@ class CostarBlockStackingSequence(Sequence):
             # current_images = tf.image.resize_images(current_images,[224,224])
             # print("---",init_images.shape)
             # X = init_images
-            if (self.data_features_to_extract is None or
-                    'current_xyz_3' in self.data_features_to_extract or
+            # TODO(ahundt) determine if we really want this input data to be augmented any time we are training...
+            X = encode_action_and_images(
                     'image_0_image_n_vec_xyz_10' in self.data_features_to_extract or
                     'image_0_image_n_vec_xyz_nxygrid_12' in self.data_features_to_extract):
+                    init_images=init_images, current_images=current_images,
+                    y=y, random_augmentation=self.is_training)
                 # regression input case for translation only
                 action_poses_vec = np.concatenate([encoded_poses[:, :3], action_labels], axis=-1)
                 X = [init_images, current_images, action_poses_vec]
@@ -587,6 +684,7 @@ class CostarBlockStackingSequence(Sequence):
             # print("shape=====",X.shape)
 
             # determine the label
+            y = encode_label(self.label_features_to_extract, y, action_successes, self.random_augmentation)
             if self.label_features_to_extract is None or 'grasp_goal_xyz_3' in self.label_features_to_extract:
                 # regression to translation case, see semantic_translation_regression in cornell_grasp_train.py
                 y = grasp_metrics.batch_encode_xyz_qxyzw_to_xyz_aaxyz_nsc(y, random_augmentation=self.random_augmentation)

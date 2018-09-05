@@ -144,7 +144,7 @@ def collect_data(args):
                 tf_listener=tf_listener)
 
     # print out task info
-    # TODO(ahundt) re-enable summary for this task 
+    # TODO(ahundt) re-enable summary for this task
     # if args.verbose > 0:
     #     print(task.nodeSummary())
     #     print(task.children['ROOT()'])
@@ -191,7 +191,7 @@ def collect_data(args):
     start = max(0, args.start-1)
     i = start
     idx = i + 1
-    # go home on startup outside of try block so program 
+    # go home on startup outside of try block so program
     # won't save files if ROS is not active and ready
     home()
     # start collecting data
@@ -200,8 +200,8 @@ def collect_data(args):
         while i < args.execute:
             home_q, home_pose = home()
             collector.set_home_pose(home_pose)
-    
-            # perform initial rate sleep to 
+
+            # perform initial rate sleep to
             # initialize duration remaining time counter
             rate.sleep()
             t = rospy.Time(0)
@@ -215,21 +215,21 @@ def collect_data(args):
             # It's just overkill
             #names, options = task.sampleSequence()
             #plan = OptionsExecutionManager(options)
-    
+
             # Reset the task manager
             reward = 0.
             stack_task.reset()
             rospy.loginfo("Starting loop...")
-    
+
             poses = []
             cur_pose = None
             frame_count = 0
             # Update the plan and the collector in synchrony.
             # This loop is exited upon completion with a break statement.
             while not rospy.is_shutdown():
-    
+
                 cur_pose = collector.current_ee_pose
-    
+
                 # Note: this will be "dummied out" for most of
                 start_time = time.clock()
                 done = stack_task.tick()
@@ -241,13 +241,13 @@ def collect_data(args):
                                        'Alternately, run this program in a debugger '
                                        'to try and diagnose the issue.')
                 update_time = time.clock()
-    
+
                 # figure out where the time has gone
                 time_str = ('Total tick + log time: {:04} sec, '
                             'Robot Tick: {:04} sec, '
                             'Data Logging: {:04} sec'.format(update_time - start_time, tick_time - start_time, update_time - tick_time))
-                
-                # Check if this script is running quickly enough, 
+
+                # Check if this script is running quickly enough,
                 # and print a warning if it isn't
                 verify_update_rate(update_time_remaining=rate.remaining(), update_rate=args.rate, info=time_str)
                 rate.sleep()
@@ -255,9 +255,9 @@ def collect_data(args):
                 #     collector.save(idx, reward)
                 #     exit()
                 frame_count += 1
-        
+
                 if stack_task.finished_action:
-    
+
                     object_was_placed = (collector.prev_action is not None and
                                         "place" in collector.prev_action.split(':')[-1])
                     if object_was_placed:
@@ -265,7 +265,7 @@ def collect_data(args):
                         # save the most recent pose update
                         rospy.loginfo("Remembering " + str(collector.prev_action))
                         poses.append(cur_pose)
-    
+
                 if done:
                     if stack_task.ok:
                         savestr = "WE WILL SAVE TO DISK"
@@ -275,7 +275,7 @@ def collect_data(args):
                     if stack_task.ok:
                         # Increase count
                         i += 1
-    
+
                         # We should actually check results here
                         # home and observe are now built into the actions
                         # home(); observe()
@@ -288,7 +288,7 @@ def collect_data(args):
                             reward = 0.
                         rospy.loginfo("reward = " + str(reward))
                     break
-    
+
             if stack_task.ok:
                 collector.save(idx, reward)
                 print("------------------------------------------------------------")
@@ -317,7 +317,7 @@ def collect_data(args):
                                        "hopefully somebody will restart it automatically! "
                                        "You can try the following bash line for auto restarts: "
                                        "while true; do ./scripts/run.py --execute 1000; done")
-    
+
             rospy.loginfo('Attempting to unstack the blocks')
 
             for count_from_top, drop_pose in enumerate(reversed(poses)):
@@ -325,12 +325,12 @@ def collect_data(args):
                     continue
                 # Determine destination spot above the block
                 unstack_one_block(drop_pose, move_to_pose, close_gripper, open_gripper, i=count_from_top)
-            
+
             if len(poses) > 0 and drop_pose is not None:
                 # one extra unstack step, try to get the block on the bottom.
-                count_from_top+=1
-                # move vertically down in the z axis, 
-                # but by slightly less than a 
+                count_from_top += 1
+                # move vertically down in the z axis,
+                # but by slightly less than a
                 # whole block length which is 0.05 meters
                 drop_pose.p[2] -= 0.035
                 result = None
@@ -351,7 +351,7 @@ def collect_data(args):
     except RuntimeError as ex:
         ex_type, ex2, tb = sys.exc_info()
         # save the current data if we can
-        message = ('error.failure due to RuntimeError:\n' + 
+        message = ('error.failure due to RuntimeError:\n' +
                     ''.join(traceback.format_exception(etype=type(ex), value=ex, tb=tb)))
         rospy.logerr(message)
         collector.save(idx, 'error.failure', log=message)
@@ -368,7 +368,7 @@ def collect_data(args):
         collector.save(idx, 'error.failure', log=message)
         # re-raise the caught exception https://stackoverflow.com/a/4825279/99379
         raise
-        
+
 
 def verify_update_rate(update_time_remaining, update_rate=10, minimum_update_rate_fraction_allowed=0.1, info=''):
     """
@@ -431,7 +431,7 @@ def unstack_one_block(drop_pose, move_to_pose, close_gripper, open_gripper,
         move_to_pose(pose_random)
     else:
         rospy.logwarn('unstack_one_block() pose_random was None! this needs to be debugged')
-    
+
     # release the object
     open_gripper()
     return grasp_pose2
@@ -468,7 +468,7 @@ def initialize_collection_objects(args, observe, collector, stack_task):
     # Set the function which sends the robot to home and
     # gets an update of all the object poses.
     # set fn to call after each action
-    stack_task.setUpdate(update) 
+    stack_task.setUpdate(update)
     return home, rate, move_to_pose, close_gripper, open_gripper
 
 def main():

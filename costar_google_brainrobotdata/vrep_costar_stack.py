@@ -13,8 +13,8 @@ display.
 
 The app can be served using:
 
-    bokeh serve --show vrep_costar_stack.py --args --data_dir /Users/athundt/.keras/datasets/costar_block_stacking_dataset_v0.2/2018-05-23-20-46-09_example000001.success.h5f
-    bokeh serve --show vrep_costar_stack.py --args  --data-dir "~/.keras/datasets/costar_block_stacking_dataset_v0.2/*success.h5f"
+    bokeh serve --show vrep_costar_stack.py --args --data_dir /Users/athundt/.keras/datasets/costar_block_stacking_dataset_v0.4/2018-05-23-20-46-09_example000001.success.h5f
+    bokeh serve --show vrep_costar_stack.py --args  --data-dir "~/.keras/datasets/costar_block_stacking_dataset_v0.4/*success.h5f"
 
 Note that the data dir with * uses glob syntax, so this example will only load the data which has been labeled as successful grasps.
 """
@@ -121,7 +121,7 @@ from vrep_grasp import VREPGraspVisualization
 
 # flags.DEFINE_string('data_dir',
 #                     os.path.join(os.path.expanduser("~"),
-#                                  '.keras', 'datasets', 'costar_block_stacking_dataset_v0.2'),
+#                                  '.keras', 'datasets', 'costar_block_stacking_dataset_v0.4'),
 #                     """Path to directory containing the dataset.""")
 
 # the following line is needed for tf versions before 1.5
@@ -198,7 +198,7 @@ def vrep_grasp_main(_):
 
 # parser = argparse.ArgumentParser(description='Process additional parameters for stack player')
 
-# parser.add_argument('--data-dir', type=str, action='store', default='~/.keras/datasets/costar_block_stacking_dataset_v0.2',
+# parser.add_argument('--data-dir', type=str, action='store', default='~/.keras/datasets/costar_block_stacking_dataset_v0.4',
 #                     help='directory path containing the data')
 
 # args = parser.parse_args()
@@ -383,8 +383,8 @@ def check_errors(file_list, index, action='next'):
 ## Start the bokeh rendering script portion
 renderer = hv.renderer('bokeh')
 
-#example_filename = "C:/Users/Varun/JHU/LAB/Projects/costar_block_stacking_dataset_v0.2/2018-05-23-20-18-25_example000002.success.h5f"
-#file_name_list = glob.glob("C:/Users/Varun/JHU/LAB/Projects/costar_block_stacking_dataset_v0.2/*success.h5f")
+#example_filename = "C:/Users/Varun/JHU/LAB/Projects/costar_block_stacking_dataset_v0.4/2018-05-23-20-18-25_example000002.success.h5f"
+#file_name_list = glob.glob("C:/Users/Varun/JHU/LAB/Projects/costar_block_stacking_dataset_v0.4/*success.h5f")
 
 FLAGS(sys.argv)
 if vrep is not None:

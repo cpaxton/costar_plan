@@ -103,7 +103,7 @@ class DataGenerator(keras.utils.Sequence):
         return X, y
 
 
-filenames = glob.glob(os.path.expanduser("~/JHU/LAB/Projects/costar_block_stacking_dataset_v0.2/*success.h5f"))
+filenames = glob.glob(os.path.expanduser("~/JHU/LAB/Projects/costar_block_stacking_dataset_v0.4/*success.h5f"))
 #print(filenames)
 training_generator = DataGenerator(filenames,batch_size=1)
 # X,y=training_generator.__getitem__(1)

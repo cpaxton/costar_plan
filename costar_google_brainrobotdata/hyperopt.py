@@ -304,7 +304,7 @@ def optimize(
     # an additional option is 'resnet_conv_identity_block', but it never really did well.
     # dense_block does really well for the cornell dataset, vgg_conv_block for costar stacking dataset
     hyperoptions.add_param('trunk_model_name', ['vgg_conv_block', 'dense_block', 'nasnet_normal_a_cell'],
-                           default='nasnet_normal_a_cell', enable=False, required=True)
+                           default='nasnet_normal_a_cell', enable=True, required=True)
     # Enable or disable coordconv
     # https://eng.uber.com/coordconv/
     # https://github.com/titu1994/keras-coordconv

@@ -47,7 +47,7 @@ def main(_):
     FLAGS.feature_combo = feature_combo
     FLAGS.crop_to = 'center_on_gripper_grasp_box_and_rotate_upright'
     if FLAGS.load_hyperparams is None:
-        # FLAGS.load_hyperparams = ('/home/ahundt/datasets/logs/hyperopt_logs_cornell/'
+        # FLAGS.load_hyperparams = ('~/datasets/logs/hyperopt_logs_cornell/'
         #                           '2018-02-23-09-35-21_-vgg_dense_model-dataset_cornell_grasping-grasp_success/'
         #                           '2018-02-23-09-35-21_-vgg_dense_model-dataset_cornell_grasping-grasp_success_hyperparams.json')
 
@@ -56,11 +56,11 @@ def main(_):
         #                           '-vgg_dense_model-dataset_cornell_grasping-grasp_success_hyperparams.json')
 
         # (not very good) Best result from classification hyperopt run ending 2018-03-16:
-        # FLAGS.load_hyperparams = ('/home/ahundt/src/costar_ws/src/costar_plan/costar_google_brainrobotdata/hyperparams/classification/'
+        # FLAGS.load_hyperparams = ('~/src/costar_ws/src/costar_plan/costar_google_brainrobotdata/hyperparams/classification/'
         #                           '2018-03-14-00-40-09_-vgg19_dense_model-dataset_cornell_grasping-grasp_success_hyperparams.json')
 
         # (not very good) Best NON VGG result from classification hyperopt run ending 2018-03-16:
-        # FLAGS.load_hyperparams = ('/home/ahundt/src/costar_ws/src/costar_plan/costar_google_brainrobotdata/hyperparams/classification/'
+        # FLAGS.load_hyperparams = ('~/src/costar_ws/src/costar_plan/costar_google_brainrobotdata/hyperparams/classification/'
         #                           '2018-03-16-06-15-01_-densenet_dense_model-dataset_cornell_grasping-grasp_success_hyperparams.json')
 
         # Quite good kfold, best hyperparams from 2018-04 2000 model hyperopt run TODO(ahundt) add details from kfold run

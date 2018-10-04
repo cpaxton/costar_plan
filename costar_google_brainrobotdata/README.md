@@ -1,9 +1,79 @@
 
 # CoSTAR Hyper
 
-## Google Brain Grasp Dataset APIs
 
 Author and maintainer: `Andrew Hundt <ATHundt@gmail.com>`
+
+## Costar Block Stacking Dataset
+
+The Block stacking dataset is currently hosted on google drive. It can be downloaded with [rclone](https://github.com/ncw/rclone).
+
+Follow the [google drive costar block stacking dataset v0.2 download link](https://drive.google.com/drive/folders/1k7N1EvxRh7GwS5tbax8RAeUU_dcPGWOw?usp=sharing), and add the folder to your drive. This should not use up any of your storage limit.
+
+```
+rclone copy drive:costar_block_stacking_dataset_v0.4 ~/.keras/dataset/costar_block_stacking_dataset_v0.4 --exclude="*failure*"
+```
+
+Two lines to read one file from the dataset:
+```
+h5 = h5py.File(filename, 'r')
+x = np.array(h5[key])
+```
+
+Detailed documentation is in the dataset README.md.
+
+More precisely:
+
+```#!/usr/bin/env python
+
+import sys
+
+filename = sys.argv[1]
+
+import h5py
+import matplotlib.pyplot as plt
+import numpy as np
+from image import *
+
+horizon = 10
+i0 = 0
+
+h5 = h5py.File(filename, 'r')
+string = list(h5["label_to_string"])
+label = np.array(h5["label"])
+imgs = ConvertPNGListToNumpy(np.array(h5["images_rgb"]))
+
+changed = np.abs(np.diff(label, axis=-1)) > 0
+selected = np.zeros_like(label)
+selected[1:] = changed
+selected[-1] = 1
+selected[0] = 1
+selected = selected > 0
+
+selected_action = np.zeros_like(label)
+selected_action[:-1] = changed
+selected_action[-1] = 1
+selected_action[0] = 1
+selected_action = selected_action > 0
+
+print(selected)
+selected_imgs = imgs[selected]
+
+plt.figure()
+for i, img in enumerate(selected_imgs):
+    plt.subplot(1,len(selected_imgs),i+1)
+    plt.axis("off")
+    plt.imshow(img)
+
+plt.figure()
+plt.axis("off")
+plt.imshow(selected_imgs[4])
+
+plt.show()```
+
+some of those fields will vary for different use cases.
+
+## Google Brain Grasp Dataset APIs
 
 <img width="1511" alt="2017-12-16 surface relative transforms correct" src="https://user-images.githubusercontent.com/55744/34134058-5846b59e-e426-11e7-92d6-699883199255.png">
 This version should be ready to use when generating data real training.
@@ -47,7 +117,7 @@ The Block stacking dataset is currently hosted on google drive. It can be downlo
 Follow the [google drive costar block stacking dataset v0.2 download link](https://drive.google.com/drive/folders/1k7N1EvxRh7GwS5tbax8RAeUU_dcPGWOw?usp=sharing), and add the folder to your drive. This should not use up any of your storage limit.
 
 ```
-rclone copy drive:costar_block_stacking_dataset_v0.2 ~/.keras/dataset/costar_block_stacking_dataset_v0.2 --exclude="*failure*"
+rclone copy drive:costar_block_stacking_dataset_v0.4 ~/.keras/dataset/costar_block_stacking_dataset_v0.4 --exclude="*failure*"
 ```
 
 Configure `cornell_hyperopt.py` to run on the problem you'd like, the script supports both the cornell and the costar block stacking ataset. Sorry for the bad naming, this a historical artifact that should be resolved at some point in the future.

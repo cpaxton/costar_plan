@@ -1,12 +1,18 @@
 # -*- coding: utf-8 -*-
 """
-An example of a simple player widget animating an Image demonstrating
-how to connnect a simple HoloViews plot with custom widgets and
-combine them into a bokeh layout.
+A simple player widget for visualizing an example in the dataset.
 
-The app can be served using:
+Start in the costar_plan directory:
 
-    bokeh serve --show scripts/stack_player.py --args  --data-dir "~/.keras/datasets/costar_block_stacking_dataset_v0.2/*success.h5f"
+    ~/src/costar_plan/ctp_integration
+
+The app can be started (served) using the following line, it will use glob to find matching files:
+
+    bokeh serve --show scripts/stack_player.py --args  --data-dir "~/.keras/datasets/costar_block_stacking_dataset_v0.4/*success.h5f"
+
+Alternate command:
+
+    bokeh serve --show scripts/stack_player.py --args --data-dir ~/.keras/datasets/costar_block_stacking_dataset_v0.4/
 
 Note that the data dir with * uses glob syntax, so this example will only load the data which has been labeled as successful grasps.
 """
@@ -44,7 +50,7 @@ except ImportError:
 
 parser = argparse.ArgumentParser(description='Process additional parameters for stack player')
 
-parser.add_argument('--data-dir', type=str, action='store', default='~/.keras/datasets/costar_block_stacking_dataset_v0.2',
+parser.add_argument('--data-dir', type=str, action='store', default='~/.keras/datasets/costar_block_stacking_dataset_v0.4',
                     help='directory path containing the data')
 
 args = parser.parse_args()
@@ -141,6 +147,8 @@ def generate_gripper_action_label(data, action_status, gripper_status, gripper_a
         gripper_action_goal_idx = list(data['gripper_action_goal_idx'])
         print(gripper_action_goal_idx)
         print("gripper_action_labels already exist..")
+        print("gripper_action_label length: " + str(len(gripper_action_label)))
+        print("gripper_action_goal_idx length: " + str(len(gripper_action_goal_idx)))
     else:
         # compute the gripper action label on the fly
         unique_actions, indices = np.unique(action_status, return_index=True)
@@ -194,6 +202,8 @@ def check_errors(file_list, index, action='next'):
     index: index of the file to check
     action: action to identify the button task
     """
+    if not file_list:
+        raise ValueError('List of files to load is empty! Quitting')
     file_list_copy = file_list[:]
     index_copy = index
     print(file_list[index])
@@ -218,10 +228,28 @@ if tf is not None:
     tf.enable_eager_execution()
 renderer = hv.renderer('bokeh')
 
-#example_filename = "C:/Users/Varun/JHU/LAB/Projects/costar_block_stacking_dataset_v0.2/2018-05-23-20-18-25_example000002.success.h5f"
-#file_name_list = glob.glob("C:/Users/Varun/JHU/LAB/Projects/costar_block_stacking_dataset_v0.2/*success.h5f")
+#example_filename = "C:/Users/Varun/JHU/LAB/Projects/costar_block_stacking_dataset_v0.4/2018-05-23-20-18-25_example000002.success.h5f"
+#file_name_list = glob.glob("C:/Users/Varun/JHU/LAB/Projects/costar_block_stacking_dataset_v0.4/*success.h5f")
 
-file_name_list = glob.glob(os.path.expanduser(args.data_dir))
+path = os.path.expanduser(args.data_dir)
+
+if '.h5f' in path:
+    filenames = glob.glob(args.data_dir)
+else:
+    filenames = os.listdir(path)
+    # use the full path name
+    filenames = [os.path.join(path, filename) for filename in filenames]
+
+# filter out files that aren't .h5f files
+ignored_files = [filename for filename in filenames if '.h5f' not in filename]
+filenames = [filename for filename in filenames if '.h5f' in filename]
+
+# Report ignored files to the user
+if ignored_files:
+    print('Ignoring the following files which do not contain ".h5f": \n\n' + str(ignored_files) + '\n\n')
+
+file_name_list = filenames
+
 index = 0
 
 index = check_errors(file_name_list, index)
@@ -230,7 +258,8 @@ rgb_images, frame_indices, gripper_status, action_status, gripper_action_label, 
 print('images loaded')
 # Declare the HoloViews object
 start = 0
-end = len(rgb_images)
+end = len(rgb_images) - 1
+print(' End Index of RGB images: ' + str(end))
 # TODO(ahundt) resize image, all of this size code had no effect
 width = int(640*1.5)
 height = int(480*1.5)
@@ -293,8 +322,8 @@ def next_image(files, action):
     height = int(rgb_images[0].shape[0])
     width = int(rgb_images[0].shape[1])
     start = 0
-    end = len(rgb_images)
-    print(end)
+    end = len(rgb_images) - 1
+    print(' End Index of RGB images: ' + str(end))
 
     def slider_update(attrname, old, new):
         plot.update(slider.value)

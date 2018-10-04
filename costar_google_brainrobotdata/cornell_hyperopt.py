@@ -1,4 +1,5 @@
 import tensorflow as tf
+from keras import backend as K
 from tensorflow.python.platform import flags
 
 import hyperopt
@@ -59,6 +60,16 @@ def cornell_hyperoptions(problem_type, param_to_optimize):
 
 
 def main(_):
+
+    # prevent errors from being printed for hours when memory runs out
+    # https://github.com/tensorflow/tensorflow/issues/20998
+    # commented because this approach doesn't work...
+    # config = tf.ConfigProto()
+    # config.gpu_options.allow_growth = True
+    # config.report_tensor_allocations_upon_oom = False
+    # # config.inter_op_parallelism_threads = 40
+    # tf_session = tf.Session(config=config)
+    # K.set_session(tf_session)
     # Edit these flags to choose your configuration:
     # FLAGS.problem_type = 'classification'
     # FLAGS.dataset_name = 'cornell_grasping'

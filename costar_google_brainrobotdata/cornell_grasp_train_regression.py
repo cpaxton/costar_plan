@@ -25,35 +25,35 @@ def main(_):
     FLAGS.crop_to = 'image_contains_grasp_box_center'
     if FLAGS.load_hyperparams is None:
         # Results from classification hyperparameter run
-        # FLAGS.load_hyperparams = ('/home/ahundt/datasets/logs/hyperopt_logs_cornell/'
+        # FLAGS.load_hyperparams = ('~/datasets/logs/hyperopt_logs_cornell/'
         #                           '2018-02-23-09-35-21_-vgg_dense_model-dataset_cornell_grasping-grasp_success/'
         #                           '2018-02-23-09-35-21_-vgg_dense_model-dataset_cornell_grasping-grasp_success_hyperparams.json')
 
         # Results from first regression hyperparameter run
-        # FLAGS.load_hyperparams = ('/home/ahundt/datasets/logs/hyperopt_logs_cornell_regression/'
+        # FLAGS.load_hyperparams = ('~/datasets/logs/hyperopt_logs_cornell_regression/'
         #                           '2018-03-01-15-12-20_-vgg_regression_model-dataset_cornell_grasping-norm_sin2_cos2_hw_yx_6/'
         #                           '2018-03-01-15-12-20_-vgg_regression_model-dataset_cornell_grasping-norm_sin2_cos2_hw_yx_6_hyperparams.json')
 
         # Just try out NasNet directly without hyperopt (it didn't work well on 2017-03-04)
-        # FLAGS.load_hyperparams = ('/home/ahundt/src/costar_ws/src/costar_plan/costar_google_brainrobotdata/nasnet_large.json')
+        # FLAGS.load_hyperparams = ('~/src/costar_ws/src/costar_plan/costar_google_brainrobotdata/nasnet_large.json')
 
         # decent, but didn't run kfold 2018-03-05, + 2018-03-07 trying with mae
-        # FLAGS.load_hyperparams = ('/home/ahundt/.keras/datasets/logs/hyperopt_logs_cornell_regression/'
+        # FLAGS.load_hyperparams = ('~/.keras/datasets/logs/hyperopt_logs_cornell_regression/'
         #                           '2018-03-03-16-33-06_-vgg_regression_model-dataset_cornell_grasping-norm_sin2_cos2_hw_yx_6/'
         #                           '2018-03-03-16-33-06_-vgg_regression_model-dataset_cornell_grasping-norm_sin2_cos2_hw_yx_6_hyperparams.json')
 
         # Old best first epoch on hyperopt run 2018-03-06:
-        # FLAGS.load_hyperparams = ('/home/ahundt/.keras/datasets/logs/hyperopt_logs_cornell_regression/'
+        # FLAGS.load_hyperparams = ('~/.keras/datasets/logs/hyperopt_logs_cornell_regression/'
         #                           '2018-03-06-00-20-24_-vgg19_regression_model-dataset_cornell_grasping-norm_sin2_cos2_hw_yx_6/'
         #                           '2018-03-06-00-20-24_-vgg19_regression_model-dataset_cornell_grasping-norm_sin2_cos2_hw_yx_6_hyperparams.json')
 
         # Current best performance with mae on val + test 2018-03-07, haven't tried on kfold yet 2018-03-06
-        # FLAGS.load_hyperparams = ('/home/ahundt/.keras/datasets/logs/hyperopt_logs_cornell_regression/'
+        # FLAGS.load_hyperparams = ('~/.keras/datasets/logs/hyperopt_logs_cornell_regression/'
         #                           '2018-03-05-23-05-07_-vgg_regression_model-dataset_cornell_grasping-norm_sin2_cos2_hw_yx_6/'
         #                           '2018-03-05-23-05-07_-vgg_regression_model-dataset_cornell_grasping-norm_sin2_cos2_hw_yx_6_hyperparams.json')
 
         # Best first and last epoch on hyperopt run 2018-03-08
-        # FLAGS.load_hyperparams = ('/home/ahundt/.keras/datasets/logs/hyperopt_logs_cornell_regression/'
+        # FLAGS.load_hyperparams = ('~/.keras/datasets/logs/hyperopt_logs_cornell_regression/'
         #                           '2018-03-07-18-36-17_-vgg_regression_model-dataset_cornell_grasping-norm_sin2_cos2_hw_yx_6/'
         #                           '2018-03-07-18-36-17_-vgg_regression_model-dataset_cornell_grasping-norm_sin2_cos2_hw_yx_6_hyperparams.json')
 

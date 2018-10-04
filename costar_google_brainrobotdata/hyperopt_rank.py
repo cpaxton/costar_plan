@@ -95,10 +95,28 @@ flags.DEFINE_integer(
     'Results should only belong to this epoch if --filter_epoch=True'
 )
 
+flags.DEFINE_integer(
+    'max_epoch',
+    None,
+    'Results should only belong to this epoch or lower, not enabled by default.'
+)
+
+flags.DEFINE_integer(
+    'min_epoch',
+    None,
+    'Results should only belong to this epoch or higher, not enabled by default.'
+)
+
 flags.DEFINE_boolean(
     'filter_unique',
     False,
     'Filter unique results. This will retain only the best epoch for each model.'
+)
+
+flags.DEFINE_string(
+    'basename_contains',
+    None,
+    'Only include rows where the basename contains the string you specify, useful for extracting a single specific model.'
 )
 
 FLAGS = flags.FLAGS
@@ -121,6 +139,12 @@ def main(_):
             # filter specific epochs
             if FLAGS.filter_epoch:
                 dataframe = dataframe.loc[dataframe['epoch'] == FLAGS.epoch]
+
+            if FLAGS.max_epoch is not None:
+                dataframe = dataframe.loc[dataframe['epoch'] <= FLAGS.max_epoch]
+
+            if FLAGS.min_epoch is not None:
+                dataframe = dataframe.loc[dataframe['epoch'] >= FLAGS.min_epoch]
 
             # manage hyperparams
             if len(hyperparam_filename) > 1:
@@ -146,11 +170,14 @@ def main(_):
     results_df = pandas.DataFrame()
     results_df = pandas.concat(dataframe_list, ignore_index=True)
     results_df = results_df.sort_values(FLAGS.sort_by, ascending=FLAGS.ascending, kind='mergesort')
+    if FLAGS.basename_contains is not None:
+        # match rows where the basename contains the string specified in basename_contains
+        results_df = results_df[results_df['basename'].str.contains(FLAGS.basename_contains)]
     # re-number the row indices according to the sorted order
     results_df = results_df.reset_index(drop=True)
 
     if FLAGS.filter_unique:
-            results_df = results_df.drop_duplicates(subset='csv_filename')
+        results_df = results_df.drop_duplicates(subset='csv_filename')
 
     if FLAGS.print_results:
         with pandas.option_context('display.max_rows', None, 'display.max_columns', None):

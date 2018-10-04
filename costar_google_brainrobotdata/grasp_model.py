@@ -29,7 +29,7 @@ from keras.layers.merge import Add
 from keras.models import Model
 from keras.layers import Lambda
 from keras.layers import Reshape
-from keras.applications.imagenet_utils import _obtain_input_shape
+from keras_applications.imagenet_utils import _obtain_input_shape
 import keras_applications
 
 import keras_contrib
@@ -279,7 +279,7 @@ def classifier_block(input_tensor, include_top=True, top='classification',
 
 def top_block(x, output_image_shape=None, top='classification', dropout_rate=0.0, include_top=True,
               classes=1, activation='sigmoid', final_pooling=None,
-              filters=64, dense_layers=0, hidden_activation='relu', name='', verbose=0):
+              filters=64, dense_layers=0, hidden_activation='relu', name='', verbose=1):
     """ Perform final convolutions for decision making, then apply the classification block.
 
         The top block adds the final "decision making" layers
@@ -312,11 +312,15 @@ def top_block(x, output_image_shape=None, top='classification', dropout_rate=0.0
             x = GlobalMaxPooling2D()(x)
             # x = Flatten()(x)
 
+        if verbose > 0:
+            print('top_block() single prediction (sucha as classification) top_block dense layers:' + str(dense_layers))
         for i in range(dense_layers):
             # combined full connected layers
             if dropout_rate is not None:
                 x = Dropout(dropout_rate)(x)
 
+            if verbose > 0:
+                print('top_block dense layer ' + str(i))
             x = Dense(filters, activation=hidden_activation)(x)
 
         if dropout_rate is not None:
@@ -350,7 +354,8 @@ def top_block(x, output_image_shape=None, top='classification', dropout_rate=0.0
     x = classifier_block(x, include_top=include_top, top=top, classes=classes,
                          activation=activation, input_shape=output_image_shape,
                          final_pooling=final_pooling, name=name, verbose=verbose)
-    print('top_block x: ' + str(x))
+    if verbose > 0:
+        print('top_block x: ' + str(x))
     return x
 
 
@@ -370,6 +375,7 @@ def hypertree_model(
         create_tree_trunk_fn=None,
         top_block_dense_layers=0,
         top_block_hidden_activation='relu',
+        top_block_fn=top_block,
         verbose=0):
 
     if images is None and image_shapes is None:
@@ -430,7 +436,8 @@ def hypertree_model(
         # and the classifier block according to the problem type.
         # Dense layers for single prediction problems, and
         # Conv2D layers for pixel-wise prediction problems.
-        xi = top_block(
+        # TODO(ahundt) move these parameters out to generalize this api, except for xi, name shape, and verbose
+        xi = top_block_fn(
             xi, output_shape, top, dropout_rate,
             include_top, classes, activation,
             final_pooling, top_block_filters,
@@ -502,7 +509,8 @@ def choose_hypertree_model(
         trunk_normalization='none',
         coordinate_data=None,
         hidden_activation=None,
-        vector_normalization='batch_norm'):
+        vector_normalization='batch_norm',
+        version=1):
     """ Construct a variety of possible models with a tree shape based on hyperparameters.
 
     # Arguments
@@ -527,6 +535,7 @@ def choose_hypertree_model(
         top_block_hidden_activation: Deprecated, use hidden_activation instead.
         hidden_activation: override vector, trunk, and top_block hidden activation,
             setting them all to this value. Example values include 'relu', 'elu', and 'linear'.
+        version: an integer version number used to identify saved hyperparam settings.
 
     # Notes
 
@@ -587,6 +596,14 @@ def choose_hypertree_model(
         trunk_hidden_activation = hidden_activation
         vector_hidden_activation = hidden_activation
         top_block_hidden_activation = hidden_activation
+
+    if version == 0:
+        print(
+            'hyperparams with version 0 loaded, '
+            'old versions always had 0 dense layers, '
+            'so we are setting top_block_dense_layers to '
+            'reproduce old models correctly.')
+        top_block_dense_layers = 0
 
     if top == 'segmentation':
         name_prefix = 'dilated_'
@@ -916,6 +933,7 @@ def choose_hypertree_model(
             top=top,
             top_block_filters=top_block_filters,
             top_block_hidden_activation=top_block_hidden_activation,
+            top_block_dense_layers=top_block_dense_layers,
             classes=classes,
             output_shape=output_shape,
             verbose=verbose

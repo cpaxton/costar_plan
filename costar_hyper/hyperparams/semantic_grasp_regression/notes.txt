@@ -1,6 +1,6 @@
 
 2018-08-12 best translation only model with 0.3 val_grasp_acc:
-hyperparams/semantic_grasp_regression/2018-07-06-22-34-31_nasnet_mobile_semantic_grasp_regression_model-_img_nasnet_mobile_vec_dense_trunk_vgg_conv_block-dataset_costar_block_stacking-grasp_goal_xyz_aaxyz_nsc_8_hyperparams.json
+hyperparams/semantic_grasp_regression/2018-07-06-22-34-31_nasnet_mobile_semantic_grasp_regression_model-dataset_costar_block_stacking-grasp_goal_xyz_aaxyz_nsc_8_hyperparams.json.json
 
 Note that for the above performance the input vector must exclude the aaxyz part, which requires a modification to
 hypertree_train.py semantic_translation_regression data features.
